@@ -1,0 +1,28 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Environment files containing secrets
+.env
+*.env.local
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local model caches & downloads
+.cache/
+hf_models/
+
+# Generated media / sample test outputs
+output_*.png
+output_*.jpg
+test_*.png
+test_*.jpg
+
+# Operating System files
+.DS_Store
+Thumbs.db
