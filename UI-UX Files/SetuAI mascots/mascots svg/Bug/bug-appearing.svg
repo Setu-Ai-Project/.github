@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Bug appearing - squashed entrance pose">
+  <title>Bug - appearing</title>
+  <!-- Same base shapes/colors, squash wrapper + motion lines. No gradients. -->
+  <g transform="translate(100 176) scale(1.08 0.86) translate(-100 -176)">
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M88 48 L80 30" fill="none" stroke="#303030" stroke-width="5"/>
+    <path d="M112 48 L120 30" fill="none" stroke="#303030" stroke-width="5"/>
+    <circle cx="79" cy="28" r="5.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <circle cx="121" cy="28" r="5.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <path d="M38 118 Q34 134 40 150" fill="none" stroke="#6E6D6C" stroke-width="3"/>
+    <path d="M162 118 Q166 134 160 150" fill="none" stroke="#6E6D6C" stroke-width="3"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="82" cy="168" rx="11" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="118" cy="168" rx="11" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="100" cy="122" rx="40" ry="38" fill="#DC6F51" stroke="#303030" stroke-width="5"/>
+    <path d="M100 88 L100 156" stroke="#303030" stroke-width="2.5"/>
+    <circle cx="82" cy="112" r="7" fill="#303030"/>
+    <circle cx="118" cy="112" r="7" fill="#303030"/>
+    <circle cx="84" cy="136" r="5.5" fill="#303030"/>
+    <circle cx="116" cy="136" r="5.5" fill="#303030"/>
+    <path d="M66 122 L78 130" stroke="#303030" stroke-width="10" stroke-linecap="round"/>
+    <path d="M134 122 L122 130" stroke="#303030" stroke-width="10" stroke-linecap="round"/>
+    <rect x="76" y="114" width="48" height="42" rx="7" fill="#85CEC7" stroke="#303030" stroke-width="4"/>
+    <rect x="93" y="110" width="14" height="8" rx="3" fill="#6E6D6C" stroke="#303030" stroke-width="2.5"/>
+    <rect x="82" y="123" width="7" height="7" rx="2" fill="none" stroke="#303030" stroke-width="2"/>
+    <path d="M83 126.5 L85.5 129 L89.5 124.5" fill="none" stroke="#303030" stroke-width="1.8"/>
+    <path d="M93 127 H116" stroke="#303030" stroke-width="1.8"/>
+    <rect x="82" y="133" width="7" height="7" rx="2" fill="none" stroke="#303030" stroke-width="2"/>
+    <path d="M83 136.5 L85.5 139 L89.5 134.5" fill="none" stroke="#303030" stroke-width="1.8"/>
+    <path d="M93 137 H116" stroke="#303030" stroke-width="1.8"/>
+    <rect x="82" y="143" width="7" height="7" rx="2" fill="none" stroke="#303030" stroke-width="2"/>
+    <path d="M93 147 H112" stroke="#6E6D6C" stroke-width="1.8"/>
+    <circle cx="76" cy="134" r="7" fill="#303030" stroke="#303030" stroke-width="3"/>
+    <circle cx="124" cy="134" r="7" fill="#303030" stroke="#303030" stroke-width="3"/>
+    <circle cx="100" cy="66" r="24" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <path d="M92 92 Q96 89.5 100 92 Q104 94.5 108 92" fill="none" stroke="#DC6F51" stroke-width="2.5"/>
+    <ellipse cx="76" cy="82" rx="4.5" ry="3" fill="#DC6F51" stroke="#303030" stroke-width="1.5"/>
+    <ellipse cx="124" cy="82" rx="4.5" ry="3" fill="#DC6F51" stroke="#303030" stroke-width="1.5"/>
+  </g>
+  <g id="eyes" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="88" cy="66" r="14" fill="#85CEC7" stroke="#3A8A83" stroke-width="4"/>
+    <circle cx="112" cy="66" r="14" fill="#85CEC7" stroke="#3A8A83" stroke-width="4"/>
+    <path d="M102 66 H98" stroke="#3A8A83" stroke-width="4"/>
+    <circle cx="90" cy="69" r="5.5" fill="#303030"/>
+    <circle cx="110" cy="69" r="5.5" fill="#303030"/>
+    <circle cx="91.5" cy="67" r="1.8" fill="#85CEC7"/>
+    <circle cx="111.5" cy="67" r="1.8" fill="#85CEC7"/>
+    <path d="M78 50 Q88 46 97 50" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <path d="M103 50 Q112 46 122 50" fill="none" stroke="#303030" stroke-width="2.5"/>
+  </g>
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">BUG</text>
+</svg>
