@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type Mode = "signup" | "login";
 
 export default function Home() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("signup");
   const isSignup = mode === "signup";
 
@@ -54,7 +56,10 @@ export default function Home() {
 
         <form
           className="mt-6 flex flex-col gap-4"
-          onSubmit={(e) => e.preventDefault()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            router.push("/onboarding");
+          }}
         >
           <label className="flex flex-col gap-1.5 text-[16px] font-bold">
             Email
