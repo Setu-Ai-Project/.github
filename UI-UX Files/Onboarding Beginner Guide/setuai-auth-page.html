@@ -6,6 +6,21 @@
 <link rel="icon" href="setuai-logo.webp" />
 <title>SetuAI — The Next Step in AI Literacy</title>
 <style>
+  @font-face {
+    font-family: "Player Sans";
+    src: url("fonts/PlayerSansMono8x13-Classic.ttf") format("truetype");
+    font-weight: 400; font-style: normal;
+  }
+  @font-face {
+    font-family: "Player Sans";
+    src: url("fonts/PlayerSansMono8x13-Bold.ttf") format("truetype");
+    font-weight: 700; font-style: normal;
+  }
+  @font-face {
+    font-family: "Player Sans";
+    src: url("fonts/PlayerSansMono8x13-Italic.ttf") format("truetype");
+    font-weight: 400; font-style: italic;
+  }
   :root {
     --cream: #F8F7F1;
     --ink: #172A32;
@@ -15,7 +30,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: "Player Sans Classic", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: "Player Sans", "Player Sans Classic", system-ui, -apple-system, "Segoe UI", sans-serif;
     background: var(--cream);
     color: var(--ink);
     min-height: 100vh;
@@ -33,7 +48,7 @@
   .wordmark { display: flex; align-items: center; gap: 12px; }
   .logo-img {
     width: 48px; height: 48px; border: 4px solid var(--ink); border-radius: 16px;
-    box-shadow: 4px 4px 0 var(--ink); image-rendering: pixelated; display: block;
+    box-shadow: 4px 4px 0 var(--ink); image-rendering: pixelated; display: block; background: #fff;
   }
   .wordmark span.name { font-size: 28px; font-weight: 900; letter-spacing: -0.5px; }
   .tagline { font-size: 24px; font-style: italic; opacity: 0.8; }

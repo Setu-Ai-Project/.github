@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="setuai-logo.webp" />
+<title>SetuAI — Onboarding preview</title>
+<style>
+  @font-face { font-family: "Player Sans"; src: url("fonts/PlayerSansMono8x13-Classic.ttf") format("truetype"); font-weight: 400; font-style: normal; }
+  @font-face { font-family: "Player Sans"; src: url("fonts/PlayerSansMono8x13-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; }
+  @font-face { font-family: "Player Sans"; src: url("fonts/PlayerSansMono8x13-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; }
+  :root { --cream: #F8F7F1; --ink: #172A32; --coral: #DC6F51; --teal: #85CEC7; --gray: #6E6D6C; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Player Sans", "Player Sans Classic", system-ui, sans-serif;
+    background: var(--cream); color: var(--ink); min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px; position: relative; overflow-x: hidden;
+  }
+  .blob { position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none; }
+  .blob-teal { left: -96px; top: 40px; width: 288px; height: 288px; background: rgba(133,206,199,.4); }
+  .blob-coral { right: -96px; bottom: 40px; width: 320px; height: 320px; background: rgba(220,111,81,.25); }
+  .topbar { position: relative; z-index: 1; width: 100%; max-width: 448px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 900; }
+  .brand img { width: 32px; height: 32px; border: 3px solid var(--ink); border-radius: 12px; image-rendering: pixelated; display: block; background: #fff; }
+  .skip { font-size: 16px; font-weight: 900; color: var(--gray); text-decoration: underline; text-underline-offset: 4px; }
+  main {
+    position: relative; z-index: 1; margin-top: 24px; width: 100%; max-width: 448px;
+    background: #fff; border: 4px solid var(--ink); border-radius: 24px;
+    padding: 32px; box-shadow: 8px 8px 0 var(--ink); text-align: center;
+  }
+  .eyebrow { font-size: 16px; font-weight: 700; color: var(--gray); }
+  .mascot { width: 160px; height: 160px; margin: 8px auto 0; display: block; }
+  h1 { margin-top: 8px; font-size: 28px; font-weight: 900; line-height: 1.2; }
+  .bodycopy { margin-top: 8px; font-size: 16px; line-height: 1.6; }
+  .dots { margin-top: 24px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .dot { height: 12px; width: 12px; border-radius: 999px; background: rgba(23,42,50,.15); }
+  .dot.done { background: var(--teal); }
+  .dot.active { width: 32px; background: var(--ink); }
+  .nav { margin-top: 24px; display: flex; gap: 12px; }
+  .btn-back {
+    border: 3px solid var(--ink); background: #fff; border-radius: 16px; padding: 12px 20px;
+    font-size: 16px; font-weight: 900; font-family: inherit; cursor: pointer; color: var(--ink);
+  }
+  .btn-next, a.btn-next {
+    flex: 1; border: 4px solid var(--ink); background: var(--ink); color: var(--cream);
+    border-radius: 16px; padding: 12px 20px; font-size: 16px; font-weight: 900; font-family: inherit;
+    cursor: pointer; text-decoration: none; display: inline-block;
+  }
+  #backBtn[hidden] { display: none; }
+</style>
+</head>
+<body>
+  <div class="blob blob-teal"></div>
+  <div class="blob blob-coral"></div>
+
+  <div class="topbar">
+    <span class="brand"><img src="setuai-logo.webp" alt="SetuAI logo" />SetuAI</span>
+    <a class="skip" href="setuai-dashboard.html">Skip</a>
+  </div>
+
+  <main>
+    <p class="eyebrow" id="eyebrow">Step 1 of 4</p>
+    <img class="mascot" id="mascot" src="mascots/spark-celebrating.svg" alt="Spark the lightbulb celebrating" />
+    <h1 id="heading">Welcome to SetuAI!</h1>
+    <p class="bodycopy" id="copy">This is Spark. Spark will cheer you on while you play games and learn about AI.</p>
+    <div class="dots" id="dots" aria-label="Onboarding progress"></div>
+    <div class="nav">
+      <button class="btn-back" id="backBtn" hidden onclick="go(step-1)">Back</button>
+      <button class="btn-next" id="nextBtn" onclick="go(step+1)">Next</button>
+    </div>
+  </main>
+
+<script>
+  const screens = [
+    { eyebrow: "Step 1 of 4", title: "Welcome to SetuAI!", copy: "This is Spark. Spark will cheer you on while you play games and learn about AI.", img: "mascots/spark-celebrating.svg", alt: "Spark the lightbulb celebrating", cta: "Next" },
+    { eyebrow: "Step 2 of 4", title: "Play games, earn XP", copy: "XP means points. You get XP every time you finish a game or a quiz. More playing, more XP!", img: "mascots/spark-mascot.svg", alt: "Spark the lightbulb smiling", cta: "Next" },
+    { eyebrow: "Step 3 of 4", title: "Earn enough XP to level up", copy: "A level is like a rank. When your XP fills the bar, you move up a level and unlock new games and surprises.", img: "mascots/spark-mascot.svg", alt: "Spark the lightbulb smiling", cta: "Next" },
+    { eyebrow: "Step 4 of 4", title: "You're ready!", copy: "Let's go earn your very first XP.", img: "mascots/spark-celebrating.svg", alt: "Spark the lightbulb celebrating", cta: "Start learning", link: "setuai-dashboard.html" }
+  ];
+  let step = 0;
+  function go(n) {
+    if (n >= screens.length) { window.location.href = "setuai-dashboard.html"; return; }
+    step = Math.max(0, n);
+    const s = screens[step];
+    document.getElementById('eyebrow').textContent = s.eyebrow;
+    document.getElementById('heading').textContent = s.title;
+    document.getElementById('copy').textContent = s.copy;
+    const m = document.getElementById('mascot');
+    m.src = s.img; m.alt = s.alt;
+    document.getElementById('backBtn').hidden = step === 0;
+    const next = document.getElementById('nextBtn');
+    next.textContent = s.cta;
+    next.onclick = () => go(step + 1);
+    const dots = document.getElementById('dots');
+    dots.innerHTML = "";
+    screens.forEach((_, i) => {
+      const d = document.createElement("span");
+      d.className = "dot" + (i === step ? " active" : i < step ? " done" : "");
+      dots.appendChild(d);
+    });
+  }
+  go(0);
+</script>
+</body>
+</html>
