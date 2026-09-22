@@ -1,0 +1,419 @@
+## Context
+
+The repo already has a real, working UI/UX auth screen at the root route (`/`) — a branded card (SetuAI logo, Player Sans font, cream/ink/coral theme, background blobs) with a client-side toggle between "Create your account" / "Welcome back" and a `<form>` that currently **fakes success** (`router.push("/onboarding")`, no real auth behind it). `app/layout.tsx` loads Player Sans and sets SetuAI metadata, but has no Clerk wrapper yet. `app/onboarding/page.tsx` and `app/dashboard/page.tsx` are both real and don't need any changes — they don't care how the user got authenticated.
+
+**Plan:** replace root `/`'s fake form with a simple branded **landing page** (keep the logo/blobs/tagline/footer, drop the form) linking out to dedicated `/sign-up` and `/sign-in` pages built from Clerk's prebuilt components, restyled via Clerk's `appearance` prop to match the SetuAI theme. This is simpler and more robust than hand-wiring Clerk's custom auth hooks into the existing toggle card, at the cost of losing the instant no-navigation toggle (switching between sign-up/log-in becomes a real route change instead of a state flip). Task 3 includes converting the root page, since whoever builds `/sign-up`/`/sign-in` is the natural owner of what root links to.
+
+---
+
+## TASK 1 — Clerk Account Setup, SDK Install, Env Vars, Proxy
+
+**Goal:** Get Clerk installed and configured in the Next.js app so the other two tasks have something to build against.
+
+**Depends on:** Nothing. Start immediately.
+**Blocks:** Task 2 and Task 3 can't be *tested* (only written) until this is done.
+
+**Project:** `frontend/gamifiedsetu` (Next.js 16, App Router, Tailwind v4)
+
+### Steps
+
+1. **Create a Clerk account & application**
+   - Go to clerk.com, sign up (or log in).
+   - Create a new Application (name it e.g. `gamifiedsetu`).
+   - In the dashboard, open **API Keys** and copy:
+     - `Publishable Key` (starts with `pk_`)
+     - `Secret Key` (starts with `sk_`)
+
+2. **Install the SDK**
+   ```
+   cd frontend/gamifiedsetu
+   npm install @clerk/nextjs
+   ```
+   Confirm it lands in *this* `package.json` (`frontend/gamifiedsetu/package.json`), not a parent directory — this bit the team once already.
+
+3. **Add environment variables**
+   - Create `frontend/gamifiedsetu/.env` (this file is already git-ignored via `.env*` — do NOT commit it):
+     ```
+     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_your_key_here
+     CLERK_SECRET_KEY=sk_your_key_here
+     ```
+   - Update `frontend/gamifiedsetu/.env.example` to list the variable *names* only (no real values), so teammates know what's needed:
+     ```
+     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+     CLERK_SECRET_KEY=
+     ```
+
+4. **Add the proxy (this project is on Next.js 16 — `middleware.ts` is deprecated, use `proxy.ts` instead; same code, just the filename/convention changed)**
+   - Create `frontend/gamifiedsetu/proxy.ts`:
+     ```ts
+     import { clerkMiddleware } from '@clerk/nextjs/server'
+
+     export default clerkMiddleware()
+
+     export const config = {
+       matcher: [
+         '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+         '/(api|trpc)(.*)',
+       ],
+     }
+     ```
+   - This is Clerk's standard recommended matcher — it makes sure Clerk tracks session state on every route except static assets.
+   - Do NOT name this file `middleware.ts` — on Next.js 16 that convention is deprecated and won't run. Only use `middleware.ts` if you're on Next.js ≤15.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `@clerk/nextjs` appears in `frontend/gamifiedsetu/package.json` dependencies
+- [ ] `.env` exists locally with real keys (confirm `git status` does NOT show it as trackable)
+- [ ] `.env.example` has variable names only
+- [ ] `proxy.ts` exists at the project root (same level as `package.json`) — NOT `middleware.ts`
+- [ ] `npm run dev` starts with no Clerk-related errors in the console
+- [ ] Post in the team channel once done, so Task 2/3 owners know they can start testing
+
+---
+
+## TASK 2 — Wire ClerkProvider and Logged-in Indicator into App Shell
+
+**Goal:** Make the whole app aware of Clerk (via `<ClerkProvider>`), and add a visible "is someone logged in?" indicator that any screen can rely on later.
+
+**Depends on:** Task 1 must be done before you can actually run and see this working (you can write the code before that, just can't verify it).
+**File owned:** `frontend/gamifiedsetu/app/layout.tsx` (you are the only one editing this file — no conflicts with Task 3)
+
+### Steps
+
+1. **Open** `frontend/gamifiedsetu/app/layout.tsx`. UI/UX already modified this — it now loads Player Sans locally and sets SetuAI metadata/favicon, but has **no Clerk wrapper yet**:
+   ```tsx
+   import type { Metadata } from "next";
+   import { Geist, Geist_Mono } from "next/font/google";
+   import localFont from "next/font/local";
+   import "./globals.css";
+
+   const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+   const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+   const playerSans = localFont({
+     src: [
+       { path: "./fonts/PlayerSansMono8x13-Classic.ttf", weight: "400", style: "normal" },
+       { path: "./fonts/PlayerSansMono8x13-Bold.ttf", weight: "700", style: "normal" },
+       { path: "./fonts/PlayerSansMono8x13-Italic.ttf", weight: "400", style: "italic" },
+     ],
+     variable: "--font-player-sans",
+   });
+
+   export const metadata: Metadata = {
+     title: "SetuAI — The Next Step in AI Literacy",
+     description: "Sign up or log in to SetuAI, the gamified learning app for kids.",
+     icons: { icon: "/setuai-logo.webp" },
+   };
+
+   export default function RootLayout({ children }: LayoutProps<"/">) {
+     return (
+       <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playerSans.variable} h-full antialiased`}>
+         <body className="min-h-full flex flex-col">{children}</body>
+       </html>
+     );
+   }
+   ```
+
+2. **Wrap it in `<ClerkProvider>` and add a header** with the logged-in indicator — keep the existing fonts/metadata exactly as-is, just layer Clerk on top:
+   ```tsx
+   import type { Metadata } from "next";
+   import { Geist, Geist_Mono } from "next/font/google";
+   import localFont from "next/font/local";
+   import {
+     ClerkProvider,
+     SignedIn,
+     SignedOut,
+     SignInButton,
+     SignUpButton,
+     UserButton,
+   } from "@clerk/nextjs";
+   import "./globals.css";
+
+   const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+   const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+   const playerSans = localFont({
+     src: [
+       { path: "./fonts/PlayerSansMono8x13-Classic.ttf", weight: "400", style: "normal" },
+       { path: "./fonts/PlayerSansMono8x13-Bold.ttf", weight: "700", style: "normal" },
+       { path: "./fonts/PlayerSansMono8x13-Italic.ttf", weight: "400", style: "italic" },
+     ],
+     variable: "--font-player-sans",
+   });
+
+   export const metadata: Metadata = {
+     title: "SetuAI — The Next Step in AI Literacy",
+     description: "Sign up or log in to SetuAI, the gamified learning app for kids.",
+     icons: { icon: "/setuai-logo.webp" },
+   };
+
+   export default function RootLayout({ children }: LayoutProps<"/">) {
+     return (
+       <ClerkProvider>
+         <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playerSans.variable} h-full antialiased`}>
+           <body className="min-h-full flex flex-col">
+             <header className="flex justify-end gap-4 p-4">
+               <SignedOut>
+                 <SignInButton mode="modal" />
+                 <SignUpButton mode="modal" />
+               </SignedOut>
+               <SignedIn>
+                 <span>Welcome back!</span>
+                 <UserButton />
+               </SignedIn>
+             </header>
+             {children}
+           </body>
+         </html>
+       </ClerkProvider>
+     );
+   }
+   ```
+
+3. This gives every future screen a working pattern: import `useUser()` from `@clerk/nextjs` client-side, or `auth()` from `@clerk/nextjs/server` server-side, to check "is someone logged in right now."
+
+**Heads up (not a blocker):** on the new landing page (Task 3), this header's Sign In/Sign Up buttons will sit above a page whose whole purpose is those same two actions. Fine to ship as-is — if it looks redundant once you see it rendered, hide the header's `SignedOut` buttons specifically on the `/` route (check `usePathname()`) as a small follow-up polish.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `app/layout.tsx` wraps everything in `<ClerkProvider>`, existing Player Sans/metadata setup untouched
+- [ ] Header shows Sign In / Sign Up buttons when logged out
+- [ ] Header shows "Welcome back!" + user avatar/button when logged in (pulled from real Clerk state, not hardcoded)
+- [ ] No console errors related to Clerk once Task 1 is complete
+- [ ] Coordinate with whoever's doing Task 1 before you run `npm run dev` locally — you need their `.env` keys present (or your own copy of them) for this to render without errors
+
+---
+
+## TASK 3 — Landing Page + Branded Sign-up/Sign-in Screens
+
+**Goal:** Turn root `/` into a simple branded landing page, and give the app dedicated `/sign-up` and `/sign-in` pages using Clerk's prebuilt components, restyled to match the SetuAI theme.
+
+**Depends on:** Task 1 must be done before you can actually run and see this working (you can write the code before that, just can't verify it).
+**Files owned:** `frontend/gamifiedsetu/app/page.tsx` (edit) + two new files — no conflicts with Task 2.
+
+### Part A — Convert root `app/page.tsx` into a landing page
+
+UI/UX built a real card here with a toggle between sign-up/log-in and a fake-success form — remove the form entirely, keep everything else they built:
+- Keep: the logo/wordmark header, background blobs, tagline, footer copy ("Master AI through games, quizzes, and more").
+- Remove: the `<form>` block (email/password inputs, the `mode` state toggle, the fake `router.push("/onboarding")` submit handler).
+- Replace the card's contents with two CTA buttons/links, styled consistently with the existing card (`border-ink`, `bg-ink`/`bg-white`, same rounded-corner treatment):
+  - "Sign up" → `/sign-up`
+  - "Log in" → `/sign-in`
+
+### Part B — Build the sign-up and sign-in pages
+
+1. **Create the sign-up page** at `frontend/gamifiedsetu/app/sign-up/[[...sign-up]]/page.tsx`:
+   ```tsx
+   import { SignUp } from "@clerk/nextjs";
+
+   export default function Page() {
+     return (
+       <div className="flex justify-center items-center min-h-screen bg-cream">
+         <SignUp
+           appearance={{
+             variables: {
+               colorBackground: "var(--color-cream)",
+               colorText: "var(--color-ink)",
+               colorPrimary: "var(--color-coral)",
+             },
+           }}
+           fallbackRedirectUrl="/onboarding"
+         />
+       </div>
+     );
+   }
+   ```
+   Note the folder name is literally `[[...sign-up]]` (double square brackets, three dots, "sign-up", closing double brackets) — this is Clerk's required catch-all route syntax, it lets their component handle multi-step flows like email verification internally.
+
+2. **Create the sign-in page** at `frontend/gamifiedsetu/app/sign-in/[[...sign-in]]/page.tsx`, same pattern:
+   ```tsx
+   import { SignIn } from "@clerk/nextjs";
+
+   export default function Page() {
+     return (
+       <div className="flex justify-center items-center min-h-screen bg-cream">
+         <SignIn
+           appearance={{
+             variables: {
+               colorBackground: "var(--color-cream)",
+               colorText: "var(--color-ink)",
+               colorPrimary: "var(--color-coral)",
+             },
+           }}
+           fallbackRedirectUrl="/onboarding"
+         />
+       </div>
+     );
+   }
+   ```
+
+**Two things to double-check against whichever `@clerk/nextjs` version actually installs (Clerk has renamed these across versions — don't assume the above is exactly right without checking):**
+- The `appearance.variables` keys shown are a starting point for matching the cream/ink/coral SetuAI theme (and ideally Player Sans for headings too) — check Clerk's current `appearance` docs for the full/correct variable and element names.
+- The redirect-after-auth prop (`fallbackRedirectUrl` above vs. older `afterSignUpUrl`/`afterSignInUrl`) needs to match your installed Clerk version — this is what replaces the old fake `router.push("/onboarding")`.
+
+### Acceptance Criteria / Definition of Done
+- [ ] Root `/` shows a landing page (logo, blobs, tagline, footer) with two CTA buttons and no leftover form fields
+- [ ] "Sign up" and "Log in" buttons navigate to `/sign-up` and `/sign-in` respectively
+- [ ] Both pages render Clerk's prebuilt components, styled close to the SetuAI theme (not Clerk's bare default look)
+- [ ] No custom form fields were hand-built — both pages use Clerk's `<SignUp />` / `<SignIn />` components directly
+- [ ] Successful sign-up/sign-in redirects to `/onboarding` (replacing the old fake navigation)
+- [ ] Coordinate with whoever's doing Task 1 before testing — you need valid Clerk keys present locally for these forms to actually render/function
+
+---
+
+## FINAL TASK (whoever integrates all three) — Verify & Commit
+
+**Depends on:** Tasks 1, 2, and 3 all merged/pulled together locally.
+
+### Steps
+1. `npm run dev`, visit `/`.
+2. Confirm the landing page renders (logo, blobs, tagline, footer, two CTA buttons) with no leftover form fields.
+3. Click "Sign up" → confirm `/sign-up` renders Clerk's sign-up form, styled close to the SetuAI theme.
+4. Create a test account with a fake-but-real-looking email → confirm redirect to `/onboarding` fires.
+5. Walk through the onboarding tour → land on `/dashboard`, confirm the header (Task 2) shows the logged-in indicator.
+6. Sign out via the header's `UserButton`.
+7. Go to `/sign-in`, log back in with the same test account → confirm the logged-in indicator reappears correctly.
+8. If any step fails, don't proceed — flag it back to whichever task owns that piece.
+9. Once verified:
+push the branch
+
+---
+
+# Pair F2 — Four Mascot Components
+
+Parallel task to the auth screens above (Pair F1). UI/UX has since delivered real mascot art — 5 approved poses per mascot (`{name}-mascot` idle, `-appearing`, `-back`, `-celebrating`, `-dismissed`) live under `UI-UX Files/SetuAI mascots/mascots svg/{Nova,Bug,Byte,Spark}/`, and only Spark's idle + celebrating poses have made it into the actual app so far (`frontend/gamifiedsetu/public/mascots/`). SetuAI's brand colors/font already exist as Tailwind tokens in `app/globals.css` (`bg-cream`, `border-ink`, `bg-coral`, `bg-tealpop`, `text-taskgray`, `font-display`) and match the mascot SVGs' palette exactly. The onboarding page (`app/onboarding/page.tsx`) already established the visual language worth reusing: cream background, thick ink border, hard drop-shadow, rounded corners.
+
+So: build with the **real art and real brand tokens**, not placeholder boxes. Each component shows its mascot's idle (`-mascot`) pose normally, and swaps to the `-dismissed` pose the moment it's dismissed — a small touch tied to logic each component needs anyway, using a pose UI/UX clearly designed for exactly this. The `-appearing`/`-back`/`-celebrating` poses aren't needed for this task's scope; ignore them for now.
+
+Shared dependency note: the `motion` package (Framer Motion's current npm name — not the legacy `framer-motion`) needs installing once in `frontend/gamifiedsetu`. Whoever gets to it first runs `npm install motion` and posts in the team channel; the other three should pull before starting so nobody duplicates the install or fights over `package-lock.json`.
+
+Each person owns exactly one component file **and copies only their own mascot's SVGs** from `UI-UX Files/SetuAI mascots/mascots svg/{Mascot}/` into `frontend/gamifiedsetu/public/mascots/` — zero file conflicts while building, since each mascot has its own filenames. Copying just the `-mascot` and `-dismissed` poses is enough for this task; copying the full set of 5 while you're there is fine too and saves a future asset hunt. Each person also gets their own throwaway test route to self-verify in isolation, so nobody has to coordinate on a shared file just to test. The combined preview page gets built once, at the end, in the Final Task.
+
+---
+
+## TASK 4 — Build NovaBanner
+
+**Goal:** A full-width banner-style mascot component using Nova's real art. Animation direction: slides down from the top on appear, reverses on dismiss.
+
+**File owned:** `frontend/gamifiedsetu/app/components/mascots/NovaBanner.tsx` (new)
+**Assets to copy:** `UI-UX Files/SetuAI mascots/mascots svg/Nova/nova-mascot.svg` and `nova-dismissed.svg` (at minimum) → `frontend/gamifiedsetu/public/mascots/`. (Ignore the older draft at `UI-UX Files/SetuAI mascots/mascots drafts/nova-mascot.svg` — it's superseded.)
+
+### What to build
+- A client component (`'use client'`) accepting exactly two props: `message` (string) and `onDismiss` (a callback with no arguments).
+- Internally track a "dismissed" boolean in local state. Wrap the visible element in Framer Motion's `AnimatePresence` + `motion.div`, conditionally rendering the `motion.div` based on that internal state — not based on the component being unmounted from outside. This is the part to get right: if dismissal instead relied on the parent removing the component from the tree, the exit animation would never play. Clicking dismiss should flip the internal state (triggering the exit transition) *and* call the `onDismiss` prop, so the parent can react too (e.g. remove it from a list).
+- Give it a full-width banner shape, styled consistent with the onboarding card (cream background, thick ink border, hard drop-shadow, rounded corners — reuse the existing `bg-cream`/`border-ink` tokens, don't invent new colors).
+- Show `nova-mascot.svg` via `next/image` (same pattern as `onboarding/page.tsx`'s existing mascot usage) alongside the message text; swap to `nova-dismissed.svg` the moment the internal state flips to dismissed, so Nova visually "goes to sleep" as it animates out.
+- A visible dismiss control (button/icon).
+
+### How to test it (do this yourself, in isolation, before anyone integrates anything)
+1. Create a temporary scratch route under `app/dev/` (e.g. `app/dev/nova-test/page.tsx`) that renders two `NovaBanner`s side by side, each with a different `message` and its own dismiss handler backed by local state.
+2. Run `npm run dev`, visit that route in the browser.
+3. Confirm both banners animate in smoothly on page load (not an instant snap), and Nova's real art renders (not a placeholder box).
+4. Click dismiss on one — confirm it animates out, the image swaps to the dismissed pose during the transition, and the other banner is unaffected.
+5. Confirm the two banners show their own distinct message text — this proves the component is genuinely reusable via props, not hardcoded.
+6. Delete the scratch test route once confirmed (it was just for your own testing — the real combined preview page comes in the Final Task).
+
+### Acceptance Criteria / Definition of Done
+- [ ] `NovaBanner.tsx` exists, accepts exactly `message` and `onDismiss` props
+- [ ] Renders Nova's real idle-pose art (not a placeholder box), styled consistent with the onboarding card's cream/ink/hard-shadow look
+- [ ] Swaps to Nova's dismissed-pose art at the moment of dismissal
+- [ ] Animates in on mount and animates out on dismiss (verified visually per steps above, not just "it compiles")
+- [ ] Two instances with different messages render and dismiss independently
+- [ ] Scratch test route deleted before final integration
+
+---
+
+## TASK 5 — Build BugTooltip
+
+**Goal:** A small popover/tooltip-style mascot component using Bug's real art. Animation: scales and fades in on appear, reverses on dismiss.
+
+**File owned:** `frontend/gamifiedsetu/app/components/mascots/BugTooltip.tsx` (new)
+**Assets to copy:** `UI-UX Files/SetuAI mascots/mascots svg/Bug/bug-mascot.svg` and `bug-dismissed.svg` (at minimum) → `frontend/gamifiedsetu/public/mascots/`.
+
+### What to build
+Same underlying pattern as Task 4 — client component, exactly `message` + `onDismiss` props, internal "dismissed" state driving `AnimatePresence`/`motion.div` so the exit animation actually plays, dismiss button that flips local state and calls `onDismiss`. Shape it as a small tooltip/popover rather than a full-width bar, same cream/ink/hard-shadow visual treatment as the rest. Show `bug-mascot.svg` normally, swap to `bug-dismissed.svg` on dismiss.
+
+### How to test it (do this yourself, in isolation)
+1. Create a temporary scratch route (e.g. `app/dev/bug-test/page.tsx`) rendering two `BugTooltip`s with different messages, each with its own dismiss handler.
+2. Run `npm run dev`, visit that route.
+3. Confirm both animate in smoothly with Bug's real art rendering, confirm dismissing one animates it out (swapping to the dismissed pose) without affecting the other, confirm distinct message text on each.
+4. Delete the scratch test route once confirmed.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `BugTooltip.tsx` exists, accepts exactly `message` and `onDismiss` props
+- [ ] Renders Bug's real idle-pose art, shaped like a tooltip/popover, consistent cream/ink/hard-shadow styling
+- [ ] Swaps to Bug's dismissed-pose art at the moment of dismissal
+- [ ] Animates in on mount and animates out on dismiss (verified visually)
+- [ ] Two instances with different messages render and dismiss independently
+- [ ] Scratch test route deleted before final integration
+
+---
+
+## TASK 6 — Build SparkCard
+
+**Goal:** A boxed card-style mascot component using Spark's real art. Animation: fades and slides up from below on appear, reverses on dismiss.
+
+**File owned:** `frontend/gamifiedsetu/app/components/mascots/SparkCard.tsx` (new)
+**Assets to copy:** `spark-mascot.svg` is already in `frontend/gamifiedsetu/public/mascots/` — just add `spark-dismissed.svg` from `UI-UX Files/SetuAI mascots/mascots svg/Spark/` (at minimum). `spark-appearing.svg`/`spark-back.svg` aren't needed for this task but are fine to copy too while you're there.
+
+### What to build
+Same underlying pattern as Task 4 — client component, exactly `message` + `onDismiss` props, internal "dismissed" state driving `AnimatePresence`/`motion.div`, dismiss control that flips local state and calls `onDismiss`. Shape it as a self-contained card, same cream/ink/hard-shadow visual treatment as the rest. Show `spark-mascot.svg` normally, swap to `spark-dismissed.svg` on dismiss (note: `spark-celebrating.svg` also already exists in `public/mascots/` from the onboarding page — not used here, that's a different pose for a different context).
+
+### How to test it (do this yourself, in isolation)
+1. Create a temporary scratch route (e.g. `app/dev/spark-test/page.tsx`) rendering two `SparkCard`s with different messages, each with its own dismiss handler.
+2. Run `npm run dev`, visit that route.
+3. Confirm both animate in smoothly with Spark's real art rendering, confirm dismissing one animates it out (swapping to the dismissed pose) without affecting the other, confirm distinct message text on each.
+4. Delete the scratch test route once confirmed.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `SparkCard.tsx` exists, accepts exactly `message` and `onDismiss` props
+- [ ] Renders Spark's real idle-pose art, shaped like a card, consistent cream/ink/hard-shadow styling
+- [ ] Swaps to Spark's dismissed-pose art at the moment of dismissal
+- [ ] Animates in on mount and animates out on dismiss (verified visually)
+- [ ] Two instances with different messages render and dismiss independently
+- [ ] Scratch test route deleted before final integration
+
+---
+
+## TASK 7 — Build ByteStrip
+
+**Goal:** A horizontal strip-style mascot component using Byte's real art. Animation: slides in from the left on appear, reverses on dismiss.
+
+**File owned:** `frontend/gamifiedsetu/app/components/mascots/ByteStrip.tsx` (new)
+**Assets to copy:** `UI-UX Files/SetuAI mascots/mascots svg/Byte/byte-mascot.svg` and `byte-dismissed.svg` (at minimum) → `frontend/gamifiedsetu/public/mascots/`.
+
+### What to build
+Same underlying pattern as Task 4 — client component, exactly `message` + `onDismiss` props, internal "dismissed" state driving `AnimatePresence`/`motion.div`, dismiss control that flips local state and calls `onDismiss`. Shape it as a slim horizontal strip, same cream/ink/hard-shadow visual treatment as the rest. Show `byte-mascot.svg` normally, swap to `byte-dismissed.svg` on dismiss.
+
+### How to test it (do this yourself, in isolation)
+1. Create a temporary scratch route (e.g. `app/dev/byte-test/page.tsx`) rendering two `ByteStrip`s with different messages, each with its own dismiss handler.
+2. Run `npm run dev`, visit that route.
+3. Confirm both animate in smoothly with Byte's real art rendering, confirm dismissing one animates it out (swapping to the dismissed pose) without affecting the other, confirm distinct message text on each.
+4. Delete the scratch test route once confirmed.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `ByteStrip.tsx` exists, accepts exactly `message` and `onDismiss` props
+- [ ] Renders Byte's real idle-pose art, shaped like a thin horizontal strip, consistent cream/ink/hard-shadow styling
+- [ ] Swaps to Byte's dismissed-pose art at the moment of dismissal
+- [ ] Animates in on mount and animates out on dismiss (verified visually)
+- [ ] Two instances with different messages render and dismiss independently
+- [ ] Scratch test route deleted before final integration
+
+---
+
+## FINAL TASK (Mascots, whoever integrates) — Combined Preview & Team Verification
+
+**Depends on:** All four component tasks (4–7) merged/pulled locally.
+
+### Steps
+1. Create `frontend/gamifiedsetu/app/dev/mascots/page.tsx` importing all four components.
+2. Render all four together on one page, plus **two instances of at least one of them** with different messages, each wired to its own local dismiss state.
+3. Run `npm run dev`, visit that route.
+4. Confirm all five render with real mascot art (no placeholder boxes), all animate in distinctly (not simultaneously snapping in), each dismiss animates out independently while swapping to that mascot's dismissed pose, and the duplicated component shows separate text on each instance and can be dismissed independently.
+5. If any component fails any of this, don't merge forward — flag it back to whoever owns that component.
+6. Once verified, commit:
+   ```
+   git add frontend/gamifiedsetu
+   git commit -m "Step 3: NovaBanner, BugTooltip, SparkCard, ByteStrip with real mascot art"
+   git push
+   ```
+
+always create a branch for act task
