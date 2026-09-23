@@ -2,6 +2,10 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+## Clerk setup
+
+Copy `.env.local.example` to `.env.local` and set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` to the publishable key from your Clerk application. The app includes pre-built sign-up and sign-in pages at `/sign-up` and `/sign-in`, and the home page displays the current authentication state.
+
 First, run the development server:
 
 ```bash
