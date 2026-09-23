@@ -3,8 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import {
   ClerkProvider,
-  SignedIn,
-  SignedOut,
+  Show,
   SignInButton,
   SignUpButton,
   UserButton,
@@ -57,15 +56,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       >
         <body className="min-h-full flex flex-col">
           <header className="flex justify-end gap-4 p-4">
-            <SignedOut>
+            <Show when="signed-out">
               <SignInButton mode="modal" />
               <SignUpButton mode="modal" />
-            </SignedOut>
+            </Show>
 
-            <SignedIn>
+            <Show when="signed-in">
               <span>Welcome back!</span>
               <UserButton />
-            </SignedIn>
+            </Show>
           </header>
 
           {children}

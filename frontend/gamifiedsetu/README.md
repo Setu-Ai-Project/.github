@@ -20,6 +20,24 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Testing with Clerk
+
+Every dev instance has Clerk's **test mode** on by default — no setup needed. Instead of signing up with a real email and checking your inbox for a verification code, use a **test email address** and the fixed test code.
+
+**How it works:**
+- Any email with a `+clerk_test` subaddress is treated as a test address — Clerk never actually sends anything to it, and the domain doesn't even need to be real.
+- Whatever verification code screen shows up during sign-up/sign-in, enter the fixed code **`424242`**.
+
+**Examples** (swap in your own name so it's clear which account is yours):
+```
+oliver+clerk_test@example.com
+olivernyirongo+clerk_test@example.com
+```
+
+This also works with a real provider if you'd rather use one, e.g. `oliver+clerk_test@gmail.com` — Clerk intercepts based on the `+clerk_test` tag before the `@`, so the domain doesn't matter either way, nothing gets delivered.
+
+This doesn't count against Clerk's dev-instance monthly sending limits, so use it freely for local testing.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
