@@ -4,6 +4,12 @@ The repo already has a real, working UI/UX auth screen at the root route (`/`) �
 
 **Plan:** replace root `/`'s fake form with a simple branded **landing page** (keep the logo/blobs/tagline/footer, drop the form) linking out to dedicated `/sign-up` and `/sign-in` pages built from Clerk's prebuilt components, restyled via Clerk's `appearance` prop to match the SetuAI theme. This is simpler and more robust than hand-wiring Clerk's custom auth hooks into the existing toggle card, at the cost of losing the instant no-navigation toggle (switching between sign-up/log-in becomes a real route change instead of a state flip). Task 3 includes converting the root page, since whoever builds `/sign-up`/`/sign-in` is the natural owner of what root links to.
 
+## General rules for every task below
+
+- **Always create your own branch for your task** — don't work directly on `main`.
+- **Never push straight to `main`.** Push your branch and open a PR for review instead.
+- **Don't delete your scratch/test files** once you're done with them. Leave them in place (e.g. under `app/dev/`) — they're useful for the team to re-check your work later, not just for your own one-time verification.
+
 ---
 
 ## TASK 1 — Clerk Account Setup, SDK Install, Env Vars, Proxy
@@ -113,15 +119,14 @@ The repo already has a real, working UI/UX auth screen at the root route (`/`) �
    }
    ```
 
-2. **Wrap it in `<ClerkProvider>` and add a header** with the logged-in indicator — keep the existing fonts/metadata exactly as-is, just layer Clerk on top:
+2. **Wrap it in `<ClerkProvider>` and add a header** with the logged-in indicator — keep the existing fonts/metadata exactly as-is, just layer Clerk on top. Note: this project has `@clerk/nextjs` `^7.9.4` installed ("Core 3"), which **removed `<SignedIn>`/`<SignedOut>` — they're still exported but throw an error on purpose if you use them.** Use the unified `<Show when="signed-in">`/`<Show when="signed-out">` component instead (confirmed against the installed package's source):
    ```tsx
    import type { Metadata } from "next";
    import { Geist, Geist_Mono } from "next/font/google";
    import localFont from "next/font/local";
    import {
      ClerkProvider,
-     SignedIn,
-     SignedOut,
+     Show,
      SignInButton,
      SignUpButton,
      UserButton,
@@ -152,14 +157,14 @@ The repo already has a real, working UI/UX auth screen at the root route (`/`) �
          <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playerSans.variable} h-full antialiased`}>
            <body className="min-h-full flex flex-col">
              <header className="flex justify-end gap-4 p-4">
-               <SignedOut>
+               <Show when="signed-out">
                  <SignInButton mode="modal" />
                  <SignUpButton mode="modal" />
-               </SignedOut>
-               <SignedIn>
+               </Show>
+               <Show when="signed-in">
                  <span>Welcome back!</span>
                  <UserButton />
-               </SignedIn>
+               </Show>
              </header>
              {children}
            </body>
@@ -272,8 +277,12 @@ UI/UX built a real card here with a toggle between sign-up/log-in and a fake-suc
 6. Sign out via the header's `UserButton`.
 7. Go to `/sign-in`, log back in with the same test account → confirm the logged-in indicator reappears correctly.
 8. If any step fails, don't proceed — flag it back to whichever task owns that piece.
-9. Once verified:
-push the branch
+9. Once verified, commit and push **your own branch** (not `main`) and open a PR:
+   ```
+   git add frontend/gamifiedsetu
+   git commit -m "Wire Clerk auth into SetuAI screens: landing page + branded sign-up/sign-in"
+   git push -u origin <your-branch-name>
+   ```
 
 ---
 
@@ -309,7 +318,7 @@ Each person owns exactly one component file **and copies only their own mascot's
 3. Confirm both banners animate in smoothly on page load (not an instant snap), and Nova's real art renders (not a placeholder box).
 4. Click dismiss on one — confirm it animates out, the image swaps to the dismissed pose during the transition, and the other banner is unaffected.
 5. Confirm the two banners show their own distinct message text — this proves the component is genuinely reusable via props, not hardcoded.
-6. Delete the scratch test route once confirmed (it was just for your own testing — the real combined preview page comes in the Final Task).
+6. Keep the scratch test route — don't delete it. It's useful for the team to re-check your work later, and the combined preview page in the Final Task is separate from it.
 
 ### Acceptance Criteria / Definition of Done
 - [ ] `NovaBanner.tsx` exists, accepts exactly `message` and `onDismiss` props
@@ -317,7 +326,7 @@ Each person owns exactly one component file **and copies only their own mascot's
 - [ ] Swaps to Nova's dismissed-pose art at the moment of dismissal
 - [ ] Animates in on mount and animates out on dismiss (verified visually per steps above, not just "it compiles")
 - [ ] Two instances with different messages render and dismiss independently
-- [ ] Scratch test route deleted before final integration
+- [ ] Scratch test route kept (not deleted)
 
 ---
 
@@ -335,7 +344,7 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
 1. Create a temporary scratch route (e.g. `app/dev/bug-test/page.tsx`) rendering two `BugTooltip`s with different messages, each with its own dismiss handler.
 2. Run `npm run dev`, visit that route.
 3. Confirm both animate in smoothly with Bug's real art rendering, confirm dismissing one animates it out (swapping to the dismissed pose) without affecting the other, confirm distinct message text on each.
-4. Delete the scratch test route once confirmed.
+4. Keep the scratch test route — don't delete it.
 
 ### Acceptance Criteria / Definition of Done
 - [ ] `BugTooltip.tsx` exists, accepts exactly `message` and `onDismiss` props
@@ -343,7 +352,7 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
 - [ ] Swaps to Bug's dismissed-pose art at the moment of dismissal
 - [ ] Animates in on mount and animates out on dismiss (verified visually)
 - [ ] Two instances with different messages render and dismiss independently
-- [ ] Scratch test route deleted before final integration
+- [ ] Scratch test route kept (not deleted)
 
 ---
 
@@ -361,7 +370,7 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
 1. Create a temporary scratch route (e.g. `app/dev/spark-test/page.tsx`) rendering two `SparkCard`s with different messages, each with its own dismiss handler.
 2. Run `npm run dev`, visit that route.
 3. Confirm both animate in smoothly with Spark's real art rendering, confirm dismissing one animates it out (swapping to the dismissed pose) without affecting the other, confirm distinct message text on each.
-4. Delete the scratch test route once confirmed.
+4. Keep the scratch test route — don't delete it.
 
 ### Acceptance Criteria / Definition of Done
 - [ ] `SparkCard.tsx` exists, accepts exactly `message` and `onDismiss` props
@@ -369,7 +378,7 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
 - [ ] Swaps to Spark's dismissed-pose art at the moment of dismissal
 - [ ] Animates in on mount and animates out on dismiss (verified visually)
 - [ ] Two instances with different messages render and dismiss independently
-- [ ] Scratch test route deleted before final integration
+- [ ] Scratch test route kept (not deleted)
 
 ---
 
@@ -387,7 +396,7 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
 1. Create a temporary scratch route (e.g. `app/dev/byte-test/page.tsx`) rendering two `ByteStrip`s with different messages, each with its own dismiss handler.
 2. Run `npm run dev`, visit that route.
 3. Confirm both animate in smoothly with Byte's real art rendering, confirm dismissing one animates it out (swapping to the dismissed pose) without affecting the other, confirm distinct message text on each.
-4. Delete the scratch test route once confirmed.
+4. Keep the scratch test route — don't delete it.
 
 ### Acceptance Criteria / Definition of Done
 - [ ] `ByteStrip.tsx` exists, accepts exactly `message` and `onDismiss` props
@@ -395,7 +404,7 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
 - [ ] Swaps to Byte's dismissed-pose art at the moment of dismissal
 - [ ] Animates in on mount and animates out on dismiss (verified visually)
 - [ ] Two instances with different messages render and dismiss independently
-- [ ] Scratch test route deleted before final integration
+- [ ] Scratch test route kept (not deleted)
 
 ---
 
@@ -409,11 +418,9 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
 3. Run `npm run dev`, visit that route.
 4. Confirm all five render with real mascot art (no placeholder boxes), all animate in distinctly (not simultaneously snapping in), each dismiss animates out independently while swapping to that mascot's dismissed pose, and the duplicated component shows separate text on each instance and can be dismissed independently.
 5. If any component fails any of this, don't merge forward — flag it back to whoever owns that component.
-6. Once verified, commit:
+6. Once verified, commit and push **your own branch** (not `main`) and open a PR:
    ```
    git add frontend/gamifiedsetu
    git commit -m "Step 3: NovaBanner, BugTooltip, SparkCard, ByteStrip with real mascot art"
-   git push
+   git push -u origin <your-branch-name>
    ```
-
-always create a branch for act task
