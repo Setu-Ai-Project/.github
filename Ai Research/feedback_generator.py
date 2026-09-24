@@ -40,6 +40,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Safety & Content Moderation integration (Track B2 Wave 1)
+from moderator import moderate_prompt, moderate_output_text, ContentModerationError
+
 # The 5 approved categories defined in the AI Research SOP & Development Plan
 APPROVED_CATEGORIES = [
     "missing details",
@@ -132,23 +135,26 @@ def generate_feedback(
     similarity_score: float,
     api_key: Optional[str] = None,
     model: str = DEFAULT_ANTHROPIC_MODEL,
+    skip_moderation: bool = False,
 ) -> Dict[str, Any]:
     """
     Calls the Anthropic API to generate structured feedback from a learner prompt
-    and similarity score.
+    and similarity score, with pre-flight input and post-flight output moderation.
 
     Args:
         learner_prompt: The prompt text submitted by the learner.
         similarity_score: Numeric score between 0.0 and 1.0.
         api_key: Optional Anthropic API key (defaults to ANTHROPIC_API_KEY env var).
         model: Anthropic model to use (default: claude-3-5-haiku-20241022).
+        skip_moderation: If True, bypasses local moderation checks (default: False).
 
     Returns:
         dict:
             {
                 "similarity_score": float,
                 "categories": List[str],
-                "feedback_text": str
+                "feedback_text": str,
+                "is_safe": bool
             }
 
     Raises:
@@ -161,11 +167,28 @@ def generate_feedback(
     if not (0.0 <= similarity_score <= 1.0):
         raise ValueError(f"similarity_score must be between 0.0 and 1.0, got {similarity_score}")
 
+    # Layer 1: Pre-Flight Input Moderation (Track B2 Wave 1)
+    if not skip_moderation:
+        mod_input = moderate_prompt(learner_prompt)
+        if not mod_input["is_safe"]:
+            return {
+                "similarity_score": round(similarity_score, 4),
+                "categories": [],
+                "feedback_text": mod_input["mascot_message"],
+                "is_safe": False,
+                "moderation": mod_input,
+            }
+
     key = api_key or os.getenv("ANTHROPIC_API_KEY")
 
     # Beginner-friendly mock fallback
     if not key or key == "your_anthropic_api_key_here":
-        return _mock_feedback(learner_prompt, similarity_score)
+        mock_res = _mock_feedback(learner_prompt, similarity_score)
+        # Layer 3: Output moderation on mock feedback text
+        mod_out = moderate_output_text(mock_res["feedback_text"])
+        mock_res["feedback_text"] = mod_out["sanitized_text"]
+        mock_res["is_safe"] = True
+        return mock_res
 
     # Import Anthropic client only when key is provided
     try:
@@ -203,10 +226,15 @@ def generate_feedback(
         validated_categories = [c.strip().lower() for c in categories if c.strip().lower() in APPROVED_CATEGORIES]
         feedback_text = parsed.get("feedback_text", "").strip()
 
+        # Layer 3: Output Moderation Guardrail on LLM generated text
+        mod_out = moderate_output_text(feedback_text)
+        sanitized_text = mod_out["sanitized_text"]
+
         return {
             "similarity_score": round(similarity_score, 4),
             "categories": validated_categories,
-            "feedback_text": feedback_text,
+            "feedback_text": sanitized_text,
+            "is_safe": mod_out["is_safe"],
         }
 
     except Exception as e:
@@ -231,9 +259,18 @@ if __name__ == "__main__":
     print(f"  Similarity Score : {result['similarity_score']}")
     print(f"  Categories       : {result['categories']}")
     print(f"  Feedback Text    : {result['feedback_text']}")
+    print(f"  Is Safe          : {result.get('is_safe', True)}")
 
     # Check that categories are valid
     for cat in result["categories"]:
         assert cat in APPROVED_CATEGORIES, f"Unexpected category: {cat}"
+
+    # Test unsafe prompt handling
+    unsafe_p = "unsafe_test with profanity"
+    print(f"\nEvaluating unsafe test input: '{unsafe_p}'")
+    unsafe_res = generate_feedback(unsafe_p, 0.40)
+    print(f"  Is Safe          : {unsafe_res['is_safe']}")
+    print(f"  Feedback Text    : {unsafe_res['feedback_text']}")
+    assert unsafe_res["is_safe"] is False
 
     print("\nModule 3 verification completed successfully.")

@@ -22,9 +22,12 @@ Usage:
 import os
 import io
 import requests
-from typing import Optional
+from typing import Optional, Union
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont
+
+# Safety & Content Moderation integration (Track B2 Wave 1)
+from moderation import moderate_prompt, moderate_image_response
 
 # Load environment variables from .env file if present
 load_dotenv()
@@ -72,12 +75,10 @@ def generate_image(
     api_key: Optional[str] = None,
     aspect_ratio: str = "1:1",
     output_format: str = "png",
-) -> bytes:
+) -> Union[bytes, str]:
     """
-    Generates an image from a text prompt using the Stability AI Core API.
-
-    If no API key is provided or found in the environment (STABILITY_API_KEY),
-    it gracefully falls back to mock mode so beginners can run and inspect the module.
+    Generates an image from a text prompt using the Stability AI Core API,
+    with Wave 1 moderation gates before generation and after response receipt.
 
     Args:
         prompt: The text description of the image to generate.
@@ -87,14 +88,22 @@ def generate_image(
         output_format: Image format ("png" or "jpeg").
 
     Returns:
-        bytes: Raw image file bytes.
+        Union[bytes, str]:
+            - Raw image file bytes if generation succeeds and passes moderation.
+            - Moderation message string if blocked at pre-flight or post-response.
 
     Raises:
         ValueError: If the prompt is empty.
-        RuntimeError: If the API call fails unexpectedly.
+        RuntimeError: If an unhandled network or server error occurs.
     """
     if not prompt or not prompt.strip():
         raise ValueError("Prompt cannot be empty.")
+
+    # 1. Before any generation occurs: Pre-Flight Input Moderation
+    is_allowed, reason = moderate_prompt(prompt)
+    if not is_allowed:
+        print(f"[image_generator] Moderation Gate: Prompt blocked - {reason}")
+        return reason
 
     key = api_key or os.getenv("STABILITY_API_KEY")
 
@@ -133,6 +142,12 @@ def generate_image(
             timeout=60,
         )
 
+        # 2. After Stability AI response is received: Output Moderation Check
+        is_safe, mod_reason = moderate_image_response(response)
+        if not is_safe:
+            print(f"[image_generator] Moderation Gate: Image response blocked - {mod_reason}")
+            return mod_reason
+
         if response.status_code == 200:
             image_bytes = response.content
             print("[image_generator] Image generated successfully!")
@@ -141,6 +156,7 @@ def generate_image(
                     f.write(image_bytes)
                 print(f"[image_generator] Image saved to: {output_path}")
             return image_bytes
+
         else:
             error_message = f"Stability API returned error {response.status_code}: {response.text}"
             print(f"[image_generator] Error: {error_message}")
@@ -152,15 +168,27 @@ def generate_image(
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Testing image_generator.py (Module 1)")
+    print("Testing image_generator.py (Module 1 with moderation.py)")
     print("=" * 60)
 
+    # 1. Test safe benign prompt
     test_prompt = "A cozy wooden treehouse in an autumn forest at sunset"
     test_output = "test_generated_image.png"
 
-    print(f"Test Prompt: {test_prompt}")
-    generated_bytes = generate_image(prompt=test_prompt, output_path=test_output)
+    print(f"\n1. Testing safe prompt: '{test_prompt}'")
+    result = generate_image(prompt=test_prompt, output_path=test_output)
+    if isinstance(result, bytes):
+        print(f"SUCCESS: Generated image size: {len(result)} bytes")
+        print(f"Output file exists: {os.path.exists(test_output)}")
+    else:
+        print(f"FAILED: Expected image bytes, got moderation message: {result}")
 
-    print(f"Generated image size: {len(generated_bytes)} bytes")
-    print(f"Output file exists: {os.path.exists(test_output)}")
-    print("Module 1 verification completed successfully.")
+    # 2. Test unsafe prompt blocked before generation
+    unsafe_prompt = "A warrior with a blood covered sword after a murder"
+    print(f"\n2. Testing unsafe prompt: '{unsafe_prompt}'")
+    blocked_result = generate_image(prompt=unsafe_prompt)
+    print(f"Returned Result: {blocked_result}")
+    assert isinstance(blocked_result, str), "Expected moderation message string"
+    assert "friendly, safe, and creative" in blocked_result
+
+    print("\nModule 1 verification completed successfully.")

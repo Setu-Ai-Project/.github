@@ -53,12 +53,20 @@ In the Prompt Lab challenge, learners practice writing descriptive prompts to re
   ```
 - **Beginner-Friendly Feature**: Includes a **mock mode** that produces deterministic feedback if `ANTHROPIC_API_KEY` is not provided.
 
+### 4. `moderator.py` (Track B2 Wave 1: Safety & Content Moderation)
+- **Job**: Provides a 4-layer defense-in-depth safety engine tailored for educational AI learning environments for kids.
+- **Layer 1 (Pre-Flight Input Screening)**: Scans learner prompts *before* costly external API calls. Detects profanity/toxicity, violence/weapons, sexual content, PII leakage (emails, phone numbers, SSNs), and prompt injection/jailbreak attempts.
+- **Layer 2 (Provider Safety Signals)**: Actively catches Stability AI's `finish-reason: CONTENT_FILTERED` header and HTTP 400 moderation intercepts.
+- **Layer 3 (Output Guardrails)**: Sanitizes LLM-generated feedback text to ensure no inappropriate language reaches the learner.
+- **Layer 4 (Mascot Educational Intervention)**: Never shows scary technical errors (`403 Forbidden`). Instead, **Bug** delivers friendly, constructive coaching encouraging learners to rephrase positively.
+- **Performance**: Instantaneous pre-flight screening (< 1ms per prompt).
+
 ---
 
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-- **Python 3.10+** (Python 3.14+ supported)
+- **Python 3.10+** (Python 3.13+ supported)
 - **Git**
 - Terminal access
 
@@ -66,7 +74,7 @@ In the Prompt Lab challenge, learners practice writing descriptive prompts to re
 From this directory (`Ai Research /`):
 
 ```bash
-# Activate the existing virtual environment
+# Activate the virtual environment
 source venv/bin/activate
 
 # Install required packages
@@ -85,7 +93,7 @@ STABILITY_API_KEY=your_stability_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 CLIP_MODEL_NAME=openai/clip-vit-base-patch32
 ```
-*(Note: If you do not have API keys yet, all modules and verification scripts run in mock/fallback mode seamlessly.)*
+*(Note: If you do not have API keys yet, all modules, moderation checks, and verification scripts run in mock/fallback mode seamlessly.)*
 
 ---
 
@@ -93,11 +101,11 @@ CLIP_MODEL_NAME=openai/clip-vit-base-patch32
 
 You can run each module directly to see how it works in isolation:
 
-### Test Module 1 (Image Generator)
+### Test Module 1 (Image Generator + Safety Guardrails)
 ```bash
 python image_generator.py
 ```
-*Expected result*: Generates an image (or mock placeholder if no API key is set) and saves `test_generated_image.png`.
+*Expected result*: Generates an image (or mock placeholder) for safe prompts, and cleanly blocks unsafe prompts with Bug's educational safety intervention.
 
 ### Test Module 2 (CLIP Similarity Scorer)
 ```bash
@@ -105,18 +113,29 @@ python similarity_scorer.py
 ```
 *Expected result*: Loads the CLIP model, compares identical images (scores ~1.0) and different images (scores significantly lower), and checks threshold status.
 
-### Test Module 3 (Feedback Classifier)
+### Test Module 3 (Feedback Classifier + Output Guardrails)
 ```bash
 python feedback_generator.py
 ```
-*Expected result*: Formats Bug's prompt template and returns selected categories from the fixed list along with encouraging feedback text.
+*Expected result*: Formats Bug's prompt template, sanitizes output text, and provides supportive guidance for both safe prompts and flagged prompts.
+
+### Test Moderation Module (Track B2 Wave 1)
+```bash
+python moderator.py
+```
+*Expected result*: Runs self-tests on benign prompts, PII detection, prompt injection defense, harm categories, and output sanitization.
 
 ---
 
-## ✅ Running the Step 1 Verification Suite
+## ✅ Verification Test Suites
 
-Run the full verification script to confirm all three modules satisfy Step 1 requirements:
+### 1. Safety & Moderation Suite (Track B2 Wave 1)
+```bash
+python verify_moderation.py
+```
+*Tests benign prompts, PII leakage, prompt injections, harm categories, image generator integration, feedback generator integration, and latency benchmarks (< 15ms).*
 
+### 2. Step 1 Baseline Verification Suite
 ```bash
 python verify_step1.py
 ```
@@ -131,10 +150,12 @@ Ai Research /
 ├── .gitignore              # Files and directories ignored by Git
 ├── requirements.txt        # Python package dependencies
 ├── README.md               # Project documentation (this file)
-├── image_generator.py      # Module 1: Text-to-Image generation
+├── moderator.py            # Track B2 Wave 1: Safety & Content Moderation
+├── image_generator.py      # Module 1: Text-to-Image generation (with safety traps)
 ├── similarity_scorer.py    # Module 2: CLIP similarity scoring & embeddings
-├── feedback_generator.py   # Module 3: Anthropic prompt feedback classifier
-└── verify_step1.py         # Step 1 verification test suite
+├── feedback_generator.py   # Module 3: Anthropic feedback (with output guardrails)
+├── verify_moderation.py    # Wave 1 Safety & Moderation verification suite
+└── verify_step1.py         # Step 1 baseline verification test suite
 ```
 
 ---
