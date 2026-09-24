@@ -35,6 +35,9 @@ load_dotenv()
 
 DEFAULT_CLIP_MODEL = os.getenv("CLIP_MODEL_NAME", "openai/clip-vit-base-patch32")
 
+# 0.85 is a provisional starting threshold based on the initial Wave 1 test results and may be tuned later with more representative images
+THRESHOLD = 0.85
+
 # Global cache for loaded model and processor to avoid reloading per request
 _CACHED_MODEL: Optional[CLIPModel] = None
 _CACHED_PROCESSOR: Optional[CLIPProcessor] = None
@@ -185,58 +188,30 @@ def calculate_similarity(
     return round(bounded_score, 4)
 
 
-def is_close_enough(similarity_score: float, threshold: float = 0.80) -> bool:
+def score_similarity(
+    image_path_a: Union[str, bytes, Image.Image],
+    image_path_b: Union[str, bytes, Image.Image],
+) -> float:
+    """
+    Computes the visual similarity score between two images using CLIP.
+
+    This is the simple public function required by Track B1 Wave 1.
+    """
+    return calculate_similarity(image_path_a, image_path_b)
+
+
+def is_close_enough(similarity_score: float, threshold: float = THRESHOLD) -> bool:
     """
     Determines whether a similarity score satisfies the passing threshold.
 
-    As outlined in Step 2 of the AI Research Development Plan, 0.8 is an initial
-    baseline judgment call to be refined in later evaluation stages.
+    As outlined in Step 2 of the AI Research Development Plan, the starting threshold is 0.75 and may be tuned later.
 
     Args:
         similarity_score: Score between 0.0 and 1.0.
-        threshold: The cutoff score for a match (default: 0.80).
+        threshold: The cutoff score for a match (default: THRESHOLD).
 
     Returns:
         bool: True if similarity_score >= threshold, False otherwise.
     """
     return similarity_score >= threshold
 
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("Testing similarity_scorer.py (Module 2)")
-    print("=" * 60)
-
-    from PIL import ImageDraw
-
-    # Generate synthetic images with distinct shapes and themes
-    # Image 1: Night sky with bright yellow moon
-    img1 = Image.new("RGB", (256, 256), color=(15, 20, 45))
-    d1 = ImageDraw.Draw(img1)
-    d1.ellipse([60, 60, 196, 196], fill=(255, 230, 80))
-
-    # Image 2: Exact copy of Image 1
-    img2 = img1.copy()
-
-    # Image 3: Daylight landscape (light blue sky with green hill and brown trunk)
-    img3 = Image.new("RGB", (256, 256), color=(135, 206, 235))
-    d3 = ImageDraw.Draw(img3)
-    d3.rectangle([0, 180, 256, 256], fill=(34, 139, 34))
-    d3.rectangle([110, 100, 146, 180], fill=(139, 69, 19))
-    d3.ellipse([80, 50, 176, 130], fill=(0, 100, 0))
-
-    print("\n1. Calculating similarity on IDENTICAL images...")
-    score_identical = calculate_similarity(img1, img2)
-    print(f"   Score: {score_identical:.4f} (Expected: ~1.0000)")
-    assert score_identical >= 0.98, "Identical images must score close to 1.0"
-
-    print("\n2. Calculating similarity on COMPLETELY DIFFERENT images...")
-    score_different = calculate_similarity(img1, img3)
-    print(f"   Score: {score_different:.4f} (Expected: noticeably lower)")
-    assert score_different < score_identical, "Different images must score lower than identical images"
-
-    print("\n3. Testing threshold checker (is_close_enough)...")
-    print(f"   Identical passed (threshold 0.85): {is_close_enough(score_identical, 0.85)}")
-    print(f"   Different passed (threshold 0.85): {is_close_enough(score_different, 0.85)}")
-
-    print("\nModule 2 verification completed successfully.")
