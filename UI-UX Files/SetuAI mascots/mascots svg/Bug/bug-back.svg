@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Bug back view">
+  <title>Bug - back</title>
+  <!-- Same colors/outline as base, rear: shell + head back, no glasses/face/board front. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M88 48 L80 30" fill="none" stroke="#303030" stroke-width="5"/>
+    <path d="M112 48 L120 30" fill="none" stroke="#303030" stroke-width="5"/>
+    <circle cx="79" cy="28" r="5.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <circle cx="121" cy="28" r="5.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="82" cy="168" rx="11" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="118" cy="168" rx="11" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="100" cy="122" rx="40" ry="38" fill="#DC6F51" stroke="#303030" stroke-width="5"/>
+    <path d="M100 86 L100 158" stroke="#303030" stroke-width="2.5"/>
+    <circle cx="82" cy="108" r="7" fill="#303030"/>
+    <circle cx="118" cy="108" r="7" fill="#303030"/>
+    <circle cx="78" cy="130" r="6" fill="#303030"/>
+    <circle cx="122" cy="130" r="6" fill="#303030"/>
+    <circle cx="86" cy="146" r="5" fill="#303030"/>
+    <circle cx="114" cy="146" r="5" fill="#303030"/>
+    <path d="M66 122 L76 134" stroke="#303030" stroke-width="10" stroke-linecap="round"/>
+    <path d="M134 122 L124 134" stroke="#303030" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="77" cy="135" r="7" fill="#303030" stroke="#303030" stroke-width="3"/>
+    <circle cx="123" cy="135" r="7" fill="#303030" stroke="#303030" stroke-width="3"/>
+    <circle cx="100" cy="66" r="24" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <path d="M100 44 L100 60" stroke="#6E6D6C" stroke-width="2.5"/>
+  </g>
+  <g id="eyes">
+    <!-- rear view: no visible face -->
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">BUG</text>
+</svg>

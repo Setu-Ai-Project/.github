@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Spark back view">
+  <title>Spark - back</title>
+  <!-- Same colors/outline as base, rear: plain bulb, no filament/face/shine. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M58 52 L66 60" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M142 52 L134 60" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M48 88 L60 90" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M152 88 L140 90" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M100 18 L100 30" stroke="#DC6F51" stroke-width="5"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M68 116 L56 128" stroke="#303030" stroke-width="11" stroke-linecap="round"/>
+    <path d="M68 116 L56 128" stroke="#6E6D6C" stroke-width="5" stroke-linecap="round"/>
+    <path d="M132 116 L144 128" stroke="#303030" stroke-width="11" stroke-linecap="round"/>
+    <path d="M132 116 L144 128" stroke="#6E6D6C" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="55" cy="130" r="6.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <circle cx="145" cy="130" r="6.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <ellipse cx="88" cy="168" rx="10" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="112" cy="168" rx="10" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <circle cx="100" cy="78" r="36" fill="#FFD93D" stroke="#303030" stroke-width="5"/>
+    <path d="M100 46 L100 70" stroke="#6E6D6C" stroke-width="2.5"/>
+    <rect x="84" y="110" width="32" height="28" rx="7" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <path d="M84 118 H116 M84 126 H116 M84 134 H116" stroke="#303030" stroke-width="2.5"/>
+    <ellipse cx="100" cy="142" rx="8" ry="6" fill="#303030" stroke="#303030" stroke-width="4"/>
+  </g>
+  <g id="eyes">
+    <!-- rear view: no visible face -->
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">SPARK</text>
+</svg>
