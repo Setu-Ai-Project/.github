@@ -39,6 +39,15 @@ app.include_router(spark_term_router)
 app.include_router(byte_fact_router)
 
 
+@app.get("/")
+def read_root():
+    return {
+        "name": "SetuAI Backend API",
+        "status": "ok",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
