@@ -4,8 +4,6 @@ import localFont from "next/font/local";
 import {
   ClerkProvider,
   Show,
-  SignInButton,
-  SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
 import "./globals.css";
@@ -43,8 +41,11 @@ const playerSans = localFont({
 
 export const metadata: Metadata = {
   title: "SetuAI — The Next Step in AI Literacy",
-  description: "Sign up or log in to SetuAI, the gamified learning app for kids.",
-  icons: { icon: "/setuai-logo.webp" },
+  description:
+    "Sign up or log in to SetuAI, the gamified learning app for kids.",
+  icons: {
+    icon: "/setuai-logo.webp",
+  },
 };
 
 export default function RootLayout({
@@ -59,14 +60,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${playerSans.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
-          <header className="flex justify-end gap-4 p-4">
-            <Show when="signed-out">
-              <SignInButton mode="modal" />
-              <SignUpButton mode="modal" />
-            </Show>
-
+          {/* Header */}
+          <header className="flex items-center justify-end gap-4 p-4">
             <Show when="signed-in">
-              <span>Welcome back!</span>
+              <span className="font-display text-[16px] font-bold text-ink">
+                Welcome back!
+              </span>
+
               <UserButton />
             </Show>
           </header>
