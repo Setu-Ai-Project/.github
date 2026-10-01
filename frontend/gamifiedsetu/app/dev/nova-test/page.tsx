@@ -1,0 +1,25 @@
+"use client";
+
+import NovaBanner from "../../components/mascots/NovaBanner";
+
+export default function NovaTestPage() {
+  return (
+    <main className="min-h-screen bg-cream p-8">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <h1 className="font-display text-3xl font-bold text-ink">
+          NovaBanner Test
+        </h1>
+
+        <NovaBanner
+          message="Welcome to the lesson! Let's get started."
+          onDismiss={() => console.log("First NovaBanner dismissed")}
+        />
+
+        <NovaBanner
+          message="A totally different second announcement."
+          onDismiss={() => console.log("Second NovaBanner dismissed")}
+        />
+      </div>
+    </main>
+  );
+}
