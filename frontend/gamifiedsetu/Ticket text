@@ -424,3 +424,2854 @@ Same underlying pattern as Task 4 — client component, exactly `message` + `onD
    git commit -m "Step 3: NovaBanner, BugTooltip, SparkCard, ByteStrip with real mascot art"
    git push -u origin <your-branch-name>
    ```
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+# Pair F1 — Wave 3, Step 6: Submission & Feedback UI
+
+## Context
+
+We're building the part of the challenge screen a learner uses to hand in an answer. They type an answer and press **Submit**. The app shows it's checking. It then shows either **Passed** (with XP earned) or **Needs revision** (with specific tips and a **Try again** button that keeps what they typed).
+
+**We are building against mock data.** The backend submissions endpoint isn't ready yet, so a fake server inside the frontend (`api/mockSubmission.ts`) answers instead. Everything goes through one function, `submitAnswer()`, and one switch, `USE_MOCK`. When the backend is ready, connecting it is a one-line change and nothing else in these tickets has to move.
+
+### What the learner sees
+
+| Learner does | Screen shows | `status` |
+|---|---|---|
+| Types an answer, presses Submit | Button says "Checking..." and is disabled; a cream "Checking..." badge appears | `pending` |
+| Answer is wrong | Coral "Needs revision" badge + a bulleted list of specific tips + "Try again" button | `needs_revision` |
+| Presses Try again | Badge and tips disappear, **typed answer stays in the box**, Submit is back | — |
+| Answer is right | Teal "Passed!" badge + "You earned 50 XP! Total XP: 50". Submit button is gone for good | `passed` |
+| Server fails | Friendly message: "We could not check your answer. Please try again in a moment." Never a blank panel | — |
+
+### Shared reference (all three tasks use this)
+
+**The data contract.** Every file agrees on this shape, which is defined once in `types/submission.ts` (Task 8):
+- `status` is one of `"pending"`, `"passed"` or `"needs_revision"`.
+- A result looks like `{ status, feedback: string[], xpEarned: number }`. `xpEarned` is `0` unless the answer passed.
+
+**How the mock behaves.** Use this to test by hand, and it's the same rule the automated tests use:
+- After a delay of about **1.2 seconds**:
+  - An answer of `correct` (ignoring capitals and surrounding spaces) **passes** with **50 XP** and the feedback `["Great job!"]`.
+  - **Anything else** returns **needs_revision** with **2 tips** and **0 XP**.
+
+**Where every file lives.** All paths are inside `frontend/gamifiedsetu/`, and `@/` in imports means this folder:
+```
+types/submission.ts                                  Task 8
+api/mockSubmission.ts      (+ .test.ts)              Task 8
+api/submissionApi.ts       (+ .test.ts)              Task 8
+app/components/submission/StatusBadge.tsx (+ test)   Task 8
+vitest.config.mts, vitest.setup.ts, package.json     Task 8
+app/dev/status-badge-test/page.tsx                   Task 8
+app/components/submission/SubmitButton.tsx (+ test)  Task 9
+app/components/submission/FeedbackList.tsx (+ test)  Task 9
+hooks/useSubmission.ts     (+ .test.ts)              Task 9
+app/dev/submission-ui-test/page.tsx                  Task 9
+app/components/submission/SubmissionPanel.tsx (+ test) Task 10
+app/dev/submission/page.tsx                          Task 10
+```
+Nobody edits a file owned by another task. If you need a change in someone else's file, ask them.
+
+**Brand styling.** Only use these existing tokens from `app/globals.css`; don't invent new colours:
+- Colours: `bg-cream`, `bg-coral`, `bg-tealpop`, `bg-white`, `text-ink`, `border-ink`, `text-taskgray`.
+- Font: `font-display` (Player Sans).
+- Card look, the same one used by `NovaBanner` and the dashboard: `rounded-2xl border-4 border-ink bg-white shadow-[8px_8px_0_#172A32]`.
+
+**Commands** (run them inside `frontend/gamifiedsetu`):
+- `npm run dev` starts the app at http://localhost:3000.
+- `npm test` runs the automated tests and stays in watch mode; press `q` to quit. Use `npx vitest run` for a single run.
+- `npx tsc --noEmit` is the TypeScript check. No output means no errors.
+- `npm run lint` is the lint check.
+
+## General rules for every task below
+
+- **Create your own branch** from the latest `main` (the branch name is given in each task). Never work on `main` directly and **never push straight to `main`**. Push your branch and open a PR.
+- **You write the tests for what you build.** Your PR is only ready when `npx vitest run`, `npx tsc --noEmit` and `npm run lint` all pass.
+- **Keep your scratch route** under `app/dev/`. Don't delete it after you're done; the team uses it to re-check your work.
+- **Only Task 8 runs `npm install`.** That prevents `package-lock.json` conflicts. Everyone else pulls `main` after Task 8's setup PR is merged.
+- **Merge order is 8 → 9 → 10.** You can *start* writing your files straight away, but you can only *run* them once the earlier task's code is on `main`. Each task says exactly what it waits for.
+- If an AI agent writes code for you, compare it to the code in your ticket before accepting. The ticket's code is the agreed version, because the other two tasks are written against it.
+
+---
+
+
+
+## TASK 8 — Data Types, Mock API, StatusBadge + Test Setup
+
+**Goal:** Build the foundation the other two tasks stand on:
+- The shared TypeScript types.
+- The fake backend.
+- The single `submitAnswer()` function the app calls.
+- The coloured `StatusBadge` pill.
+- The test framework the whole team uses.
+
+**What you'll achieve:** Any file in the app can `import { submitAnswer } from "@/api/submissionApi"` and get a realistic result back after 1.2s. `npm test` works for everyone, and a status badge renders in three clearly different colours.
+
+**Branch:** `feature/step6-task8-data-mock-badge`
+**Depends on:** Nothing. Start immediately.
+**Blocks:** Task 9 and Task 10 need your **types file** and **test setup** before they can run anything.
+
+**Do steps 1–3 first, open a small PR for them straight away (within the first hour or two), and post in the team channel "Step 6 types + test setup are on main".** Then do steps 4–7 in a second PR.
+
+**Files owned:**
+- `types/submission.ts` (new)
+- `vitest.config.mts`, `vitest.setup.ts` (new)
+- `package.json`, `package-lock.json` (edit, via `npm install`)
+- `api/mockSubmission.ts` and `api/mockSubmission.test.ts` (new)
+- `api/submissionApi.ts` and `api/submissionApi.test.ts` (new)
+- `app/components/submission/StatusBadge.tsx` and `StatusBadge.test.tsx` (new)
+- `app/dev/status-badge-test/page.tsx` (new)
+- `.env.example` (edit)
+
+### Steps
+
+**1. Create the types:** `types/submission.ts`
+```ts
+// Every status a submission can have. Using a union type means a typo like
+// "passd" is a TypeScript error instead of a silent bug.
+export type SubmissionStatus = "pending" | "passed" | "needs_revision";
+
+// What one submission result looks like.
+export interface SubmissionResult {
+  status: SubmissionStatus;
+  feedback: string[]; // specific tips shown to the learner
+  xpEarned: number; // 0 when the answer did not pass
+}
+
+// Which "mood" the screen is in. This is only about our UI, not the server.
+export type UiState = "idle" | "submitting" | "done" | "error";
+```
+
+**2. Install the test tools.** Run this inside `frontend/gamifiedsetu`:
+```
+npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom @testing-library/user-event vite-tsconfig-paths
+```
+Open `frontend/gamifiedsetu/package.json` and confirm they appear under `devDependencies` there, **not** in a parent folder's `package.json`. Then add the `test` script so `scripts` looks like this:
+```json
+"scripts": {
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "eslint",
+  "test": "vitest"
+}
+```
+
+**3. Configure Vitest.** Create `vitest.config.mts` next to `package.json`:
+```ts
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import tsconfigPaths from "vite-tsconfig-paths";
+
+export default defineConfig({
+  // tsconfigPaths makes "@/..." imports work inside tests, exactly like in the app.
+  plugins: [tsconfigPaths(), react()],
+  test: {
+    environment: "jsdom", // a fake browser so components can render in tests
+    setupFiles: ["./vitest.setup.ts"],
+  },
+});
+```
+Then create `vitest.setup.ts` next to it:
+```ts
+// Adds readable matchers like toBeInTheDocument(), toBeDisabled(), toHaveValue().
+import "@testing-library/jest-dom/vitest";
+import { afterEach } from "vitest";
+import { cleanup } from "@testing-library/react";
+
+// Remove whatever a test rendered before the next test starts.
+afterEach(() => cleanup());
+```
+Run `npx vitest run`. It should say "No test files found", which is fine because the setup works. Run `npx tsc --noEmit` and confirm it's clean. **Commit, push, open the first PR and post in the channel.**
+
+**4. Build the fake backend:** `api/mockSubmission.ts`
+```ts
+import type { SubmissionResult } from "@/types/submission";
+
+// Flip to true to see the friendly error message in the browser.
+// NEVER commit this as true.
+export const MOCK_FORCE_ERROR = false;
+
+// How long the fake server "thinks" before answering, in milliseconds.
+export const MOCK_DELAY_MS = 1200;
+
+// A promise that finishes after `ms` milliseconds.
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Pretends to be the backend. Typing exactly "correct" passes; anything else fails.
+export async function mockSubmit(answer: string): Promise<SubmissionResult> {
+  await wait(MOCK_DELAY_MS);
+
+  if (MOCK_FORCE_ERROR) {
+    throw new Error("Mock server is down");
+  }
+
+  if (answer.trim().toLowerCase() === "correct") {
+    return { status: "passed", feedback: ["Great job!"], xpEarned: 50 };
+  }
+
+  return {
+    status: "needs_revision",
+    feedback: [
+      "Your answer is missing the loop condition.",
+      "Hint: check that your counter actually increases.",
+    ],
+    xpEarned: 0,
+  };
+}
+```
+
+**5. Build the single entry point:** `api/submissionApi.ts`. This is the **only** function the rest of the app uses to submit. Nobody else calls `mockSubmit` or `fetch` directly.
+```ts
+import type { SubmissionResult } from "@/types/submission";
+import { mockSubmit } from "./mockSubmission";
+
+// The backend isn't ready yet, so we use the mock. When it's ready, this becomes
+// false and NEXT_PUBLIC_API_URL gets set. Nothing else in the app has to change.
+export const USE_MOCK = true;
+
+export async function submitAnswer(
+  challengeId: string,
+  answer: string
+): Promise<SubmissionResult> {
+  if (USE_MOCK) return mockSubmit(answer);
+
+  // Real backend (not used yet).
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/submissions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challengeId, answer }),
+  });
+  if (!res.ok) throw new Error("Submission request failed");
+  return res.json();
+}
+```
+In `.env.example`, add this line under the existing variables (the name only, with no value):
+```
+NEXT_PUBLIC_API_URL=
+```
+
+**6. Build the badge:** `app/components/submission/StatusBadge.tsx`. It's a small pill that tells the learner the result at a glance. Keep it generic, with props only, because the AI Prompt-Challenge screen will reuse it later.
+```tsx
+import type { SubmissionStatus } from "@/types/submission";
+
+// Record<SubmissionStatus, ...> forces a style for EVERY status.
+// If a status is ever added and forgotten here, TypeScript will complain.
+const STYLES: Record<SubmissionStatus, { label: string; classes: string }> = {
+  pending: { label: "Checking...", classes: "bg-cream" },
+  passed: { label: "Passed!", classes: "bg-tealpop" },
+  needs_revision: { label: "Needs revision", classes: "bg-coral" },
+};
+
+type StatusBadgeProps = {
+  status: SubmissionStatus;
+};
+
+export default function StatusBadge({ status }: StatusBadgeProps) {
+  const style = STYLES[status];
+
+  return (
+    <span
+      className={`inline-block rounded-full border-2 border-ink px-3 py-1 font-display text-sm font-bold text-ink ${style.classes}`}
+    >
+      {style.label}
+    </span>
+  );
+}
+```
+**7. Add the scratch route:** `app/dev/status-badge-test/page.tsx`
+```tsx
+import StatusBadge from "@/app/components/submission/StatusBadge";
+
+export default function StatusBadgeTestPage() {
+  return (
+    <main className="min-h-screen bg-cream p-8">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <h1 className="font-display text-3xl font-bold text-ink">
+          StatusBadge Test
+        </h1>
+        <div className="flex flex-wrap gap-3">
+          <StatusBadge status="pending" />
+          <StatusBadge status="passed" />
+          <StatusBadge status="needs_revision" />
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+### Tests to write
+
+`api/mockSubmission.test.ts`
+```ts
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MOCK_DELAY_MS, mockSubmit } from "./mockSubmission";
+
+describe("mockSubmit", () => {
+  // Fake timers let us skip the 1.2s wait instead of really waiting.
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  async function run(answer: string) {
+    const promise = mockSubmit(answer);
+    await vi.advanceTimersByTimeAsync(MOCK_DELAY_MS);
+    return promise;
+  }
+
+  it.each(["correct", "  CORRECT  ", "Correct"])("passes %j with 50 XP", async (answer) => {
+    const result = await run(answer);
+    expect(result.status).toBe("passed");
+    expect(result.xpEarned).toBe(50);
+  });
+
+  it("asks for revision with 2 tips and 0 XP for any other answer", async () => {
+    const result = await run("hello");
+    expect(result.status).toBe("needs_revision");
+    expect(result.feedback).toHaveLength(2);
+    expect(result.xpEarned).toBe(0);
+  });
+
+  it("does not answer before the delay is over", async () => {
+    let finished = false;
+    mockSubmit("hello").then(() => {
+      finished = true;
+    });
+    await vi.advanceTimersByTimeAsync(MOCK_DELAY_MS - 1);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(finished).toBe(true);
+  });
+});
+```
+
+`api/submissionApi.test.ts`
+```ts
+import { describe, expect, it, vi } from "vitest";
+import { submitAnswer } from "./submissionApi";
+import { mockSubmit } from "./mockSubmission";
+
+// Replace the real mock with an instant fake so we can check it was called.
+vi.mock("./mockSubmission", () => ({
+  mockSubmit: vi.fn(async () => ({ status: "passed", feedback: [], xpEarned: 50 })),
+}));
+
+describe("submitAnswer", () => {
+  it("uses the mock and never calls the network while USE_MOCK is true", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const result = await submitAnswer("challenge-1", "hello");
+
+    expect(mockSubmit).toHaveBeenCalledWith("hello");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.status).toBe("passed");
+  });
+});
+```
+
+`app/components/submission/StatusBadge.test.tsx`
+```tsx
+import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import StatusBadge from "./StatusBadge";
+
+describe("StatusBadge", () => {
+  it.each([
+    ["pending", "Checking...", "bg-cream"],
+    ["passed", "Passed!", "bg-tealpop"],
+    ["needs_revision", "Needs revision", "bg-coral"],
+  ] as const)("shows the right label and colour for %s", (status, label, colour) => {
+    render(<StatusBadge status={status} />);
+    expect(screen.getByText(label)).toHaveClass(colour);
+  });
+});
+```
+
+### How to check it
+1. `npx vitest run`: 3 test files, all green.
+2. `npx tsc --noEmit`: no output.
+3. `npm run lint`: no errors.
+4. `npm run dev` → open http://localhost:3000/dev/status-badge-test. You should see three pills: a cream "Checking...", a teal "Passed!" and a coral "Needs revision", all with an ink border and the Player Sans font.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `types/submission.ts` matches the code above exactly (other tasks are written against it)
+- [ ] Test tools are in `frontend/gamifiedsetu/package.json` `devDependencies`, and `npm test` works
+- [ ] First PR (types + test setup) merged early and announced in the team channel
+- [ ] `submitAnswer()` is the only entry point; committed with `USE_MOCK = true` and `MOCK_FORCE_ERROR = false`
+- [ ] `.env.example` lists `NEXT_PUBLIC_API_URL=` with no value
+- [ ] `StatusBadge` shows 3 clearly different pills using brand tokens only
+- [ ] `mockSubmission.test.ts`, `submissionApi.test.ts`, `StatusBadge.test.tsx` all pass
+- [ ] `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] `/dev/status-badge-test` route kept
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 9 — SubmitButton, FeedbackList + the useSubmission Hook
+
+**Goal:** Build:
+- The Submit button that locks itself while checking.
+- A reusable list of feedback tips.
+- The `useSubmission` hook: the "brain" that tracks status, feedback, XP and retry. It keeps the logic out of the visual components.
+
+**What you'll achieve:** Any component can call `const { result, uiState, totalXp, submit, retry } = useSubmission("some-id")` and get the full submit → pending → result → retry flow with no extra logic, and a double-click can never send two submissions.
+
+**Branch:** `feature/step6-task9-button-feedback-hook`
+**Depends on:** Task 8's **first PR** (types + test setup) being on `main`. You can write `SubmitButton` and `FeedbackList` before that, because they don't import anything. Pull `main` before writing the hook or any tests. The hook test mocks `submitAnswer`, so you don't need Task 8's second PR to run your tests. Its *types* do come from Task 8's first PR.
+**Blocks:** Task 10 puts all three of your pieces into the panel. Post in the channel when your PR is merged.
+
+**Files owned:**
+- `app/components/submission/SubmitButton.tsx` and `SubmitButton.test.tsx` (new)
+- `app/components/submission/FeedbackList.tsx` and `FeedbackList.test.tsx` (new)
+- `hooks/useSubmission.ts` and `hooks/useSubmission.test.ts` (new)
+- `app/dev/submission-ui-test/page.tsx` (new)
+
+### Steps
+
+**1. Build the button:** `app/components/submission/SubmitButton.tsx`. While a check is running it shows "Checking..." and can't be clicked, so a nervous learner can't send five submissions.
+```tsx
+type SubmitButtonProps = {
+  onClick: () => void;
+  loading: boolean; // true while the answer is being checked
+  disabled?: boolean; // e.g. true when the answer box is empty
+};
+
+export default function SubmitButton({ onClick, loading, disabled = false }: SubmitButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading || disabled}
+      className="rounded-2xl border-4 border-ink bg-coral px-6 py-2 font-display text-lg font-bold text-ink shadow-[4px_4px_0_#172A32] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+    >
+      {loading ? "Checking..." : "Submit"}
+    </button>
+  );
+}
+```
+
+**2. Build the feedback list:** `app/components/submission/FeedbackList.tsx`. It's a plain bulleted list of tips. Keep it generic, because the AI Prompt-Challenge screen will reuse it.
+```tsx
+type FeedbackListProps = {
+  items: string[];
+};
+
+export default function FeedbackList({ items }: FeedbackListProps) {
+  // Nothing to show → render nothing (not an empty box).
+  if (items.length === 0) return null;
+
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-ink">
+      {items.map((tip, i) => (
+        <li key={i}>{tip}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+**3. Build the hook:** `hooks/useSubmission.ts`. The first line must be `"use client"`.
+```ts
+"use client";
+
+import { useRef, useState } from "react";
+import { submitAnswer } from "@/api/submissionApi";
+import type { SubmissionResult, UiState } from "@/types/submission";
+
+export function useSubmission(challengeId: string) {
+  const [result, setResult] = useState<SubmissionResult | null>(null);
+  const [uiState, setUiState] = useState<UiState>("idle");
+  const [totalXp, setTotalXp] = useState(0);
+
+  // State updates don't land instantly, so two very fast clicks could both get in
+  // before the button re-renders as disabled. A ref updates immediately, so it
+  // stops the second click.
+  const inFlight = useRef(false);
+
+  async function submit(answer: string) {
+    if (inFlight.current) return; // a check is already running, ignore the extra call
+    inFlight.current = true;
+
+    setUiState("submitting");
+    // Show "pending" straight away, before the server replies.
+    setResult({ status: "pending", feedback: [], xpEarned: 0 });
+
+    try {
+      const response = await submitAnswer(challengeId, answer);
+      setResult(response);
+      setUiState("done");
+      if (response.status === "passed") {
+        setTotalXp((xp) => xp + response.xpEarned);
+      }
+    } catch {
+      // The panel shows a friendly message for this state.
+      setResult(null);
+      setUiState("error");
+    } finally {
+      inFlight.current = false; // allow the next submit
+    }
+  }
+
+  // Clears the RESULT only. The typed answer lives in the panel, so it survives.
+  function retry() {
+    setResult(null);
+    setUiState("idle");
+  }
+
+  return { result, uiState, totalXp, submit, retry };
+}
+```
+Note: `totalXp` lives in memory only and resets on page reload. That's expected for now. Its job is to show the XP change straight after a pass.
+
+**4. Add the scratch route:** `app/dev/submission-ui-test/page.tsx`. It needs `"use client"` because it passes click handlers.
+```tsx
+"use client";
+
+import SubmitButton from "@/app/components/submission/SubmitButton";
+import FeedbackList from "@/app/components/submission/FeedbackList";
+
+export default function SubmissionUiTestPage() {
+  return (
+    <main className="min-h-screen bg-cream p-8">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <h1 className="font-display text-3xl font-bold text-ink">
+          SubmitButton + FeedbackList Test
+        </h1>
+
+        <div className="flex flex-wrap gap-4">
+          <SubmitButton onClick={() => console.log("Submit clicked")} loading={false} />
+          <SubmitButton onClick={() => console.log("Should never log")} loading={true} />
+          <SubmitButton onClick={() => console.log("Should never log")} loading={false} disabled />
+        </div>
+
+        <FeedbackList
+          items={[
+            "Your answer is missing the loop condition.",
+            "Hint: check that your counter actually increases.",
+          ]}
+        />
+      </div>
+    </main>
+  );
+}
+```
+
+### Tests to write
+
+`app/components/submission/SubmitButton.test.tsx`
+```tsx
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import SubmitButton from "./SubmitButton";
+
+describe("SubmitButton", () => {
+  it('says "Submit" and is clickable when not loading', () => {
+    render(<SubmitButton onClick={() => {}} loading={false} />);
+    expect(screen.getByRole("button", { name: "Submit" })).toBeEnabled();
+  });
+
+  it('says "Checking..." and is disabled while loading', () => {
+    render(<SubmitButton onClick={() => {}} loading={true} />);
+    expect(screen.getByRole("button", { name: "Checking..." })).toBeDisabled();
+  });
+
+  it("is disabled when disabled is true", () => {
+    render(<SubmitButton onClick={() => {}} loading={false} disabled />);
+    expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+  });
+
+  it("calls onClick when clicked", async () => {
+    const onClick = vi.fn();
+    render(<SubmitButton onClick={onClick} loading={false} />);
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onClick while loading", async () => {
+    const onClick = vi.fn();
+    render(<SubmitButton onClick={onClick} loading={true} />);
+    await userEvent.click(screen.getByRole("button", { name: "Checking..." }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});
+```
+
+`app/components/submission/FeedbackList.test.tsx`
+```tsx
+import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import FeedbackList from "./FeedbackList";
+
+describe("FeedbackList", () => {
+  it("renders one bullet per tip, in order", () => {
+    render(<FeedbackList items={["Tip one", "Tip two"]} />);
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("Tip one");
+    expect(items[1]).toHaveTextContent("Tip two");
+  });
+
+  it("renders nothing when there are no tips", () => {
+    const { container } = render(<FeedbackList items={[]} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+```
+
+`hooks/useSubmission.test.ts`
+```ts
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { submitAnswer } from "@/api/submissionApi";
+import type { SubmissionResult } from "@/types/submission";
+import { useSubmission } from "./useSubmission";
+
+// Replace the API with a fake we fully control in each test.
+vi.mock("@/api/submissionApi", () => ({ submitAnswer: vi.fn() }));
+const mockedSubmit = vi.mocked(submitAnswer);
+
+const PASSED: SubmissionResult = { status: "passed", feedback: ["Great job!"], xpEarned: 50 };
+const NEEDS_REVISION: SubmissionResult = {
+  status: "needs_revision",
+  feedback: ["Tip one", "Tip two"],
+  xpEarned: 0,
+};
+
+describe("useSubmission", () => {
+  beforeEach(() => mockedSubmit.mockReset());
+
+  it("starts idle with no result and 0 XP", () => {
+    const { result } = renderHook(() => useSubmission("c1"));
+    expect(result.current.uiState).toBe("idle");
+    expect(result.current.result).toBeNull();
+    expect(result.current.totalXp).toBe(0);
+  });
+
+  it("shows pending while the check is running, then done", async () => {
+    let finish!: (value: SubmissionResult) => void;
+    mockedSubmit.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const { result } = renderHook(() => useSubmission("c1"));
+
+    act(() => {
+      void result.current.submit("hello");
+    });
+    expect(result.current.uiState).toBe("submitting");
+    expect(result.current.result?.status).toBe("pending");
+
+    await act(async () => finish(NEEDS_REVISION));
+    expect(result.current.uiState).toBe("done");
+  });
+
+  it("sends the challenge id and answer to the API", async () => {
+    mockedSubmit.mockResolvedValue(PASSED);
+    const { result } = renderHook(() => useSubmission("c1"));
+    await act(() => result.current.submit("correct"));
+    expect(mockedSubmit).toHaveBeenCalledWith("c1", "correct");
+  });
+
+  it("adds XP when the answer passes", async () => {
+    mockedSubmit.mockResolvedValue(PASSED);
+    const { result } = renderHook(() => useSubmission("c1"));
+    await act(() => result.current.submit("correct"));
+    expect(result.current.result?.status).toBe("passed");
+    expect(result.current.totalXp).toBe(50);
+  });
+
+  it("keeps XP at 0 and returns the tips when revision is needed", async () => {
+    mockedSubmit.mockResolvedValue(NEEDS_REVISION);
+    const { result } = renderHook(() => useSubmission("c1"));
+    await act(() => result.current.submit("hello"));
+    expect(result.current.result?.feedback).toHaveLength(2);
+    expect(result.current.totalXp).toBe(0);
+  });
+
+  it("goes to the error state when the API fails", async () => {
+    mockedSubmit.mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useSubmission("c1"));
+    await act(() => result.current.submit("hello"));
+    expect(result.current.uiState).toBe("error");
+    expect(result.current.result).toBeNull();
+  });
+
+  it("retry clears the result and goes back to idle", async () => {
+    mockedSubmit.mockResolvedValue(NEEDS_REVISION);
+    const { result } = renderHook(() => useSubmission("c1"));
+    await act(() => result.current.submit("hello"));
+    act(() => result.current.retry());
+    expect(result.current.uiState).toBe("idle");
+    expect(result.current.result).toBeNull();
+  });
+
+  it("only sends one request when submit is called twice quickly", async () => {
+    mockedSubmit.mockResolvedValue(PASSED);
+    const { result } = renderHook(() => useSubmission("c1"));
+    await act(async () => {
+      void result.current.submit("correct");
+      void result.current.submit("correct");
+    });
+    expect(mockedSubmit).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+### How to check it
+1. `npx vitest run`: your 3 test files pass, along with Task 8's.
+2. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+3. `npm run dev` → open http://localhost:3000/dev/submission-ui-test and check:
+   - The first button says "Submit" and logs to the console (F12) when clicked.
+   - The second says "Checking...", looks faded, and nothing happens when you click it.
+   - The third says "Submit", looks faded, and nothing happens when you click it.
+   - Below them is a two-bullet list.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `SubmitButton` and `FeedbackList` take props only (no hook/API imports) and use brand tokens only
+- [ ] `useSubmission` starts with `"use client"` and returns exactly `{ result, uiState, totalXp, submit, retry }`
+- [ ] XP only goes up on `passed`
+- [ ] Double-submit guard in place and proven by the "twice quickly" test
+- [ ] `SubmitButton.test.tsx`, `FeedbackList.test.tsx`, `useSubmission.test.ts` all pass
+- [ ] `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] `/dev/submission-ui-test` route kept
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 10 — SubmissionPanel + Demo Page (+ Mascot Polish)
+
+**Goal:** Put all the pieces together into the full submission area:
+- The answer box.
+- The Submit button.
+- The status badge.
+- The tips.
+- The Try again button.
+- The success + XP message.
+- A friendly error message.
+
+Then add a demo page that runs the whole flow.
+
+**What you'll achieve:** At `/dev/submission` a learner can:
+1. Type a wrong answer and see specific tips.
+2. Press Try again with their text still there, and fix it.
+3. Resubmit and see "Passed!" plus their XP, after which the Submit button disappears.
+
+All of this is covered by an automated test.
+
+**Branch:** `feature/step6-task10-submission-panel`
+**Depends on:** Task 8 (both PRs) and Task 9 being on `main` before you can run anything. While you wait, start on the layout and styling: copy the panel code below and temporarily replace the `useSubmission(...)` line with hard-coded values, for example:
+```ts
+const result = { status: "needs_revision" as const, feedback: ["Tip one", "Tip two"], xpEarned: 0 };
+const uiState = "done";
+```
+Restore the real line once Task 9 is merged.
+**Blocks:** Nothing. You finish the feature.
+
+**Files owned:**
+- `app/components/submission/SubmissionPanel.tsx` and `SubmissionPanel.test.tsx` (new)
+- `app/dev/submission/page.tsx` (new)
+
+### Steps
+
+**1. Build the panel:** `app/components/submission/SubmissionPanel.tsx`
+```tsx
+"use client";
+
+import { useState } from "react";
+import { useSubmission } from "@/hooks/useSubmission";
+import StatusBadge from "./StatusBadge";
+import SubmitButton from "./SubmitButton";
+import FeedbackList from "./FeedbackList";
+
+type SubmissionPanelProps = {
+  challengeId: string;
+};
+
+export default function SubmissionPanel({ challengeId }: SubmissionPanelProps) {
+  // What the learner has typed. It lives HERE, not in the hook, so "Try again" keeps it.
+  const [answer, setAnswer] = useState("");
+  const { result, uiState, totalXp, submit, retry } = useSubmission(challengeId);
+
+  const isChecking = uiState === "submitting";
+  const isPassed = result?.status === "passed";
+  const needsRevision = result?.status === "needs_revision";
+  const answerId = `answer-${challengeId}`;
+
+  return (
+    <section className="w-full max-w-xl rounded-2xl border-4 border-ink bg-white p-4 shadow-[8px_8px_0_#172A32] sm:p-6">
+      <label htmlFor={answerId} className="font-display text-lg font-bold text-ink">
+        Your answer
+      </label>
+      <textarea
+        id={answerId}
+        className="mt-2 h-32 w-full resize-y rounded-xl border-2 border-ink bg-cream p-3 text-ink placeholder:text-taskgray focus:outline-none focus:ring-2 focus:ring-coral disabled:opacity-60"
+        placeholder="Type your answer here..."
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        disabled={isChecking || isPassed}
+      />
+
+      {/* Hidden once passed, and while tips are showing (they use "Try again" instead). */}
+      {!isPassed && !needsRevision && (
+        <div className="mt-4">
+          <SubmitButton
+            onClick={() => submit(answer)}
+            loading={isChecking}
+            disabled={answer.trim() === ""}
+          />
+        </div>
+      )}
+
+      {/* aria-live makes screen readers announce whatever appears in here. */}
+      <div aria-live="polite" className="mt-4 space-y-3">
+        {result && <StatusBadge status={result.status} />}
+
+        {needsRevision && (
+          <>
+            <FeedbackList items={result.feedback} />
+            <button
+              type="button"
+              onClick={retry}
+              className="rounded-2xl border-4 border-ink bg-white px-6 py-2 font-display text-lg font-bold text-ink shadow-[4px_4px_0_#172A32] transition-transform hover:-translate-y-0.5"
+            >
+              Try again
+            </button>
+          </>
+        )}
+
+        {isPassed && (
+          <p className="font-display text-lg font-bold text-ink">
+            You earned {result.xpEarned} XP! Total XP: {totalXp}
+          </p>
+        )}
+
+        {uiState === "error" && (
+          <p className="rounded-xl border-2 border-coral bg-cream p-3 font-bold text-ink">
+            We could not check your answer. Please try again in a moment.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+```
+
+**2. Build the demo page:** `app/dev/submission/page.tsx`
+```tsx
+import SubmissionPanel from "@/app/components/submission/SubmissionPanel";
+
+export default function SubmissionDemoPage() {
+  return (
+    <main className="flex min-h-screen flex-col items-center gap-6 bg-cream px-4 py-10">
+      <h1 className="font-display text-3xl font-bold text-ink">Submission Demo</h1>
+      <p className="max-w-xl text-center text-taskgray">
+        Type <strong>correct</strong> to pass. Anything else needs revision.
+      </p>
+      <SubmissionPanel challengeId="test-challenge-1" />
+    </main>
+  );
+}
+```
+
+**3. Write the tests below and make them pass** before moving on to step 4.
+
+**4. Mascot polish (optional; only after everything above passes).** Show Spark celebrating on a pass and Nova encouraging on needs_revision. Both components already exist and take exactly `message` and `onDismiss`.
+- Add the imports to `SubmissionPanel.tsx`:
+  ```tsx
+  import SparkCard from "@/app/components/mascots/SparkCard";
+  import NovaBanner from "@/app/components/mascots/NovaBanner";
+  ```
+- Inside the `aria-live` div, add `<NovaBanner message="So close! Read the tips, fix your answer and try again." onDismiss={() => {}} />` inside the `needsRevision` block.
+- Add `<SparkCard message="Brilliant! You nailed it." onDismiss={() => {}} />` inside the `isPassed` block. Wrap that block's contents in `<>…</>` if needed.
+- The mascots use `next/image`. If your tests start failing on images, add this to the top of `SubmissionPanel.test.tsx`, under the other `vi.mock`:
+  ```tsx
+  vi.mock("next/image", () => ({
+    default: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
+  }));
+  ```
+
+### Tests to write
+
+`app/components/submission/SubmissionPanel.test.tsx`
+```tsx
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { submitAnswer } from "@/api/submissionApi";
+import type { SubmissionResult } from "@/types/submission";
+import SubmissionPanel from "./SubmissionPanel";
+
+vi.mock("@/api/submissionApi", () => ({ submitAnswer: vi.fn() }));
+const mockedSubmit = vi.mocked(submitAnswer);
+
+// Same rule as the mock server, but instant so the tests are fast.
+async function answerLikeTheMock(_challengeId: string, answer: string): Promise<SubmissionResult> {
+  if (answer.trim().toLowerCase() === "correct") {
+    return { status: "passed", feedback: ["Great job!"], xpEarned: 50 };
+  }
+  return { status: "needs_revision", feedback: ["Tip one", "Tip two"], xpEarned: 0 };
+}
+
+describe("SubmissionPanel", () => {
+  beforeEach(() => {
+    mockedSubmit.mockReset();
+    mockedSubmit.mockImplementation(answerLikeTheMock);
+  });
+
+  it("wrong answer → tips → Try again keeps the text → right answer → passed with XP", async () => {
+    const user = userEvent.setup();
+    render(<SubmissionPanel challengeId="test-challenge-1" />);
+    const answerBox = screen.getByLabelText("Your answer");
+
+    // 1. Wrong answer
+    await user.type(answerBox, "hello");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("Needs revision")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
+
+    // 2. Try again keeps what they typed
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(answerBox).toHaveValue("hello");
+    expect(screen.queryByText("Needs revision")).not.toBeInTheDocument();
+
+    // 3. Fix it and resubmit
+    await user.clear(answerBox);
+    await user.type(answerBox, "correct");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("Passed!")).toBeInTheDocument();
+    expect(screen.getByText("You earned 50 XP! Total XP: 50")).toBeInTheDocument();
+
+    // 4. No more submitting after a pass
+    expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
+    expect(answerBox).toBeDisabled();
+    expect(mockedSubmit).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps Submit disabled for an empty or blank answer", async () => {
+    const user = userEvent.setup();
+    render(<SubmissionPanel challengeId="test-challenge-1" />);
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    expect(submitButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText("Your answer"), "   ");
+    expect(submitButton).toBeDisabled();
+  });
+
+  it("shows a friendly message and lets the learner resubmit when the check fails", async () => {
+    mockedSubmit.mockRejectedValue(new Error("boom"));
+    const user = userEvent.setup();
+    render(<SubmissionPanel challengeId="test-challenge-1" />);
+
+    await user.type(screen.getByLabelText("Your answer"), "hello");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(
+      await screen.findByText("We could not check your answer. Please try again in a moment.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeEnabled();
+  });
+
+  it("puts results inside an aria-live area so screen readers announce them", async () => {
+    const user = userEvent.setup();
+    render(<SubmissionPanel challengeId="test-challenge-1" />);
+
+    await user.type(screen.getByLabelText("Your answer"), "hello");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    const badge = await screen.findByText("Needs revision");
+    expect(badge.closest('[aria-live="polite"]')).not.toBeNull();
+  });
+});
+```
+
+### How to check it
+1. `npx vitest run`: every test file from Tasks 8, 9 and 10 passes.
+2. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+3. `npm run dev` → open http://localhost:3000/dev/submission and walk through this exactly:
+   1. Type `hello` and press Submit. The button says "Checking..." for about a second and a cream "Checking..." badge shows.
+   2. The badge turns coral "Needs revision" with 2 specific tips and a "Try again" button. The Submit button is hidden.
+   3. Press Try again. `hello` is still in the box. Change it to `correct`.
+   4. Press Submit. You get a teal "Passed!" badge and "You earned 50 XP! Total XP: 50". The Submit button is gone and the box is locked.
+   5. Open the console (F12): there are no red errors.
+4. Edge cases:
+   - **Empty answer:** reload the page. Submit is disabled. Type only spaces and it is still disabled.
+   - **Server failure:** in `api/mockSubmission.ts` set `MOCK_FORCE_ERROR = true` locally, then submit. The friendly message appears and Submit is usable again. **Set it back to `false`. Don't commit it.**
+   - **Double-click:** reload, type `hello`, then double-click Submit fast. Only one check runs, so the badge appears once with no flicker.
+   - **Phone width:** open DevTools device mode (Ctrl+Shift+M) at 375px wide. Nothing overflows or gets cut off.
+
+### Acceptance Criteria / Definition of Done
+- [ ] Pending, passed and needs_revision all look clearly different
+- [ ] A wrong answer shows specific tips; "Try again" keeps the typed text
+- [ ] A pass shows XP earned; after a pass the Submit button is gone and the box is locked
+- [ ] Server failure shows the friendly message, never a blank panel, and the learner can resubmit
+- [ ] Results area has `aria-live="polite"`
+- [ ] Brand tokens only; works at 375px wide
+- [ ] `SubmissionPanel.test.tsx` passes (all 4 tests), plus Tasks 8 and 9's tests
+- [ ] `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] `/dev/submission` route kept
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## FINAL TASK (all three together, once Tasks 8, 9 and 10 are merged) — Team Verification & Handoff
+
+**Goal:** Prove the merged feature works end-to-end on `main` and hand it over. This is done **together**, in one call or sitting. It is not one person's job.
+
+### Steps
+1. Everyone pulls the latest `main` and runs `npm install` (to pick up Task 8's test tools).
+2. Run `npx vitest run`. All 7 test files must pass.
+3. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+4. Each owner opens **their own** scratch route and confirms it still looks right:
+   - Task 8: `/dev/status-badge-test`
+   - Task 9: `/dev/submission-ui-test`
+   - Task 10: `/dev/submission`
+5. Together, walk through the `/dev/submission` scenario from Task 10's "How to check it" (steps 3 and 4) on one screen.
+6. If anything fails, the owner of that file fixes it on a new branch, **adds a test that would have caught it**, and opens a PR. Then repeat this checklist.
+7. Post a short handoff in the team channel:
+   - **Done:** the submission panel with pending / passed / needs_revision states, retry that keeps the text, XP on pass, a friendly error message, and tests.
+   - **Mocked:** all results come from `api/mockSubmission.ts` (`USE_MOCK = true`) because the backend submissions endpoint isn't ready.
+   - **Reusable:** `StatusBadge` and `FeedbackList` in `app/components/submission/` are ready for the AI Prompt-Challenge screen.
+
+**When the backend is ready (later, not part of these tickets):**
+1. Set `NEXT_PUBLIC_API_URL` in your local `.env`.
+2. Flip `USE_MOCK` to `false` in `api/submissionApi.ts`.
+3. Restart `npm run dev`.
+
+If the backend's status strings or fields differ, update `types/submission.ts` first; TypeScript will point to everything else that needs changing.
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Pair F2 — Wave 3, Step 7: Mentor Mode & Mode-Switch UI
+
+## Context
+
+SetuAI isn't only for learners. A **mentor** (a teacher or helper) answers learners' questions, which we call **doubts**. In this step we build both sides of that conversation, plus a **Learner / Mentor switch** that flips the same screen between the two views:
+- A learner asks a doubt.
+- It lands in a queue.
+- A mentor opens the queue and replies.
+- The learner sees the reply.
+
+**We are building against mock data.** The backend `doubt_queue` endpoints aren't ready yet, so a fake server inside the frontend (`api/mockDoubtApi.ts`) stores doubts in the browser's `localStorage`. Because of that, a doubt sent in Learner mode really does show up in Mentor mode, and it survives a page reload. Everything goes through three functions in `api/doubtApi.ts` and one switch, `USE_MOCK`. Connecting the real backend later only touches that one file.
+
+### The journey we're building
+
+| Who | Does | Sees |
+|---|---|---|
+| Learner | Types a question, presses "Send doubt" | "Doubt sent! A mentor will reply soon." and the doubt in **My doubts** with a cream **Open** badge |
+| Mentor | Clicks **Mentor** on the switch | The **Open (1)** tab, listing open doubts oldest first, each with a reply box |
+| Mentor | Writes a reply, presses "Send reply" | The doubt leaves Open and moves to **Answered (1)** |
+| Learner | Clicks **Learner** on the switch | The same doubt now has a teal **Answered** badge and "Test Mentor says: …" with the reply |
+| Anyone | Reloads the page | Everything is still there |
+
+### Shared reference (all four tasks use this)
+
+**The data contract.** It's defined once in `types/doubt.ts` (Task 11), and every file uses it:
+- `Mode` is either `"learner"` or `"mentor"`.
+- `Doubt` is `{ id, learnerName, question, status: "open" | "answered", createdAt, reply? }`.
+  - `createdAt` is an ISO date string such as `"2026-10-02T10:30:00.000Z"`.
+  - `reply` is missing until a mentor answers.
+- `MentorReply` is `{ mentorName, text, repliedAt }`.
+
+**How the mock queue behaves:**
+- Data is stored in `localStorage` under the key `setuai_mock_doubts`. In DevTools, open Application → Local Storage to see it.
+- Every call waits **400ms** to feel like a real network.
+- New doubts get a unique `id` (`crypto.randomUUID()`) and start as `status: "open"`.
+- A reply sets `status: "answered"` and attaches `reply`.
+- Until login is wired in, names are fixed: learners are **"Test Learner"** and mentors are **"Test Mentor"**.
+
+**Where every file lives.** All paths are inside `frontend/gamifiedsetu/`, and `@/` in imports means this folder:
+```
+types/doubt.ts                                       Task 11
+api/mockDoubtApi.ts        (+ .test.ts)              Task 11
+api/doubtApi.ts            (+ .test.ts)              Task 11
+app/components/mentor-mode/DoubtCard.tsx (+ test)    Task 11
+app/dev/doubt-card-test/page.tsx                     Task 11
+context/ModeContext.tsx    (+ .test.tsx)             Task 12
+app/components/mentor-mode/ModeSwitch.tsx (+ test)   Task 12
+app/dev/mentor/page.tsx    (+ page.test.tsx)         Task 12
+app/components/mentor-mode/AskDoubtForm.tsx (+ test) Task 13
+app/components/mentor-mode/MyDoubts.tsx (+ test)     Task 13
+app/dev/learner-doubts-test/page.tsx                 Task 13
+app/components/mentor-mode/ReplyForm.tsx (+ test)    Task 14
+app/components/mentor-mode/MentorDashboard.tsx (+ test) Task 14
+app/dev/mentor-dashboard-test/page.tsx               Task 14
+```
+Nobody edits a file owned by another task. If you need a change in someone else's file, ask them.
+
+**Brand styling.** Only use the existing tokens from `app/globals.css`:
+- Colours: `bg-cream`, `bg-tealpop`, `bg-coral`, `bg-white`, `text-ink`, `border-ink`, `text-taskgray`. The font is `font-display`.
+- The card look is `rounded-2xl border-4 border-ink bg-white shadow-[8px_8px_0_#172A32]`.
+- In this feature:
+  - **Open** = `bg-cream`
+  - **Answered** = `bg-tealpop`
+  - The active toggle/tab = `bg-tealpop`
+  - Error boxes = `border-2 border-coral`
+
+**Commands** (run inside `frontend/gamifiedsetu`):
+- `npm run dev` starts the app at http://localhost:3000.
+- `npx vitest run` runs all tests once. `npm test` runs them in watch mode.
+- `npx tsc --noEmit` is the TypeScript check. No output means clean.
+- `npm run lint` is the lint check.
+
+**The test setup** (Vitest + Testing Library) is added by **Step 6, Task 8** (the first PR: `vitest.config.mts`, `vitest.setup.ts` and the `test` script). Check that `vitest.config.mts` exists on `main` before you start writing tests. If it doesn't, Task 11 adds it (see Task 11, step 0).
+
+## General rules for every task below
+
+- **Create your own branch** from the latest `main` (each task gives the branch name). **Never push straight to `main`.** Push your branch and open a PR.
+- **You write the tests for what you build.** Your PR is ready only when `npx vitest run`, `npx tsc --noEmit` and `npm run lint` all pass.
+- **Keep your scratch route** under `app/dev/`. Don't delete it after you're done.
+- **Merge order: 11 → 12 → 13 and 14 (in either order) → Task 12's final page wiring.** You can start writing your files right away. Each task says exactly what it waits for.
+- **Data loading uses one pattern, and it's on purpose.** Load inside `useEffect` with `.then()`, plus a `reloadKey` number you bump to reload (see Tasks 13 and 14). The simpler-looking `useEffect(() => { refresh(); }, [])` is **rejected by this project's lint rules** (`react-hooks/set-state-in-effect`), so don't let an AI agent "simplify" it back.
+- If an AI agent writes code for you, compare it to the code in your ticket before accepting. The ticket's code is the agreed version, because the other tasks are written against it.
+- **The Learner/Mentor switch is for development only.** In the real app a learner must *not* be able to become a mentor by clicking a button. The real role check comes from login and the backend later. Every PR for this step says so in its description.
+
+---
+
+## TASK 11 — Doubt Types, Mock Doubt Queue + DoubtCard
+
+**Goal:** Build the foundation everyone else uses:
+- The shared `Doubt` types.
+- The fake doubt queue that saves to `localStorage`.
+- The three API functions the app calls.
+- `DoubtCard`, which shows one doubt and is used in **both** the learner and mentor views.
+
+**What you'll achieve:** Any file can `import { listDoubts, createDoubt, replyToDoubt } from "@/api/doubtApi"` and get a working, persistent doubt queue, and `<DoubtCard doubt={d} />` renders any doubt correctly, open or answered.
+
+**Branch:** `feature/step7-task11-doubt-data-card`
+**Depends on:** Nothing. Start immediately.
+**Blocks:** Tasks 12, 13 and 14 all import your types and API, and 13/14 use your `DoubtCard`. **Do steps 1–3 first and open a PR for them within the first hour or two, then post "Step 7 types + doubt API are on main" in the channel.** Do steps 4–5 in a second PR.
+
+**Files owned:**
+- `types/doubt.ts` (new)
+- `api/mockDoubtApi.ts` and `api/mockDoubtApi.test.ts` (new)
+- `api/doubtApi.ts` and `api/doubtApi.test.ts` (new)
+- `app/components/mentor-mode/DoubtCard.tsx` and `DoubtCard.test.tsx` (new)
+- `app/dev/doubt-card-test/page.tsx` (new)
+- `.env.example` (edit, only if `NEXT_PUBLIC_API_URL=` isn't there yet)
+
+### Steps
+
+**0. Only if `vitest.config.mts` is NOT on `main` yet.** Step 6 Task 8 normally does this; skip this step if it's already there. Coordinate with the Step 6 Task 8 owner so only one of you does it. If you're the one:
+- Run `npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom @testing-library/user-event vite-tsconfig-paths`.
+- Add `"test": "vitest"` to the `scripts` in `package.json`.
+- Create `vitest.config.mts`:
+  ```ts
+  import { defineConfig } from "vitest/config";
+  import react from "@vitejs/plugin-react";
+  import tsconfigPaths from "vite-tsconfig-paths";
+
+  export default defineConfig({
+    plugins: [tsconfigPaths(), react()],
+    test: {
+      environment: "jsdom",
+      setupFiles: ["./vitest.setup.ts"],
+    },
+  });
+  ```
+- Create `vitest.setup.ts`:
+  ```ts
+  import "@testing-library/jest-dom/vitest";
+  import { afterEach } from "vitest";
+  import { cleanup } from "@testing-library/react";
+
+  afterEach(() => cleanup());
+  ```
+
+**1. Create the types:** `types/doubt.ts`
+```ts
+// Which view the app is showing. Controlled by the Learner/Mentor switch.
+export type Mode = "learner" | "mentor";
+
+// A doubt is either still waiting ("open") or has a mentor reply ("answered").
+export type DoubtStatus = "open" | "answered";
+
+// The mentor's answer to a doubt.
+export interface MentorReply {
+  mentorName: string;
+  text: string;
+  repliedAt: string; // ISO date text, e.g. "2026-10-02T10:30:00.000Z"
+}
+
+// One question from a learner: one row of the doubt queue.
+export interface Doubt {
+  id: string;
+  learnerName: string;
+  question: string;
+  status: DoubtStatus;
+  createdAt: string; // ISO date text
+  reply?: MentorReply; // "?" = optional. It's missing until a mentor replies.
+}
+```
+
+**2. Build the fake queue:** `api/mockDoubtApi.ts`
+```ts
+import type { Doubt } from "@/types/doubt";
+
+// Flip to true to test the friendly error messages in the browser.
+// NEVER commit this as true.
+export const MOCK_FORCE_ERROR = false;
+
+// How long every fake call takes, in milliseconds.
+export const MOCK_DELAY_MS = 400;
+
+// Where the fake queue is saved in the browser.
+export const MOCK_STORAGE_KEY = "setuai_mock_doubts";
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// localStorage only exists in the browser, not on the server, so we check first.
+function load(): Doubt[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem(MOCK_STORAGE_KEY) ?? "[]");
+  } catch {
+    return []; // corrupted data → start fresh instead of crashing
+  }
+}
+
+function save(list: Doubt[]) {
+  window.localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(list));
+}
+
+// Every fake call goes through this: wait, then maybe pretend the server is down.
+async function fakeNetwork() {
+  await wait(MOCK_DELAY_MS);
+  if (MOCK_FORCE_ERROR) throw new Error("Mock server is down");
+}
+
+export async function mockListDoubts(): Promise<Doubt[]> {
+  await fakeNetwork();
+  return load();
+}
+
+export async function mockCreateDoubt(question: string, learnerName: string): Promise<Doubt> {
+  await fakeNetwork();
+  const doubt: Doubt = {
+    id: crypto.randomUUID(), // unique id, even for two doubts sent in the same millisecond
+    learnerName,
+    question,
+    status: "open",
+    createdAt: new Date().toISOString(),
+  };
+  save([...load(), doubt]);
+  return doubt;
+}
+
+export async function mockReplyToDoubt(
+  id: string,
+  text: string,
+  mentorName: string
+): Promise<Doubt> {
+  await fakeNetwork();
+  const list = load();
+  const original = list.find((d) => d.id === id);
+  if (!original) throw new Error(`No doubt with id ${id}`);
+
+  // Make a NEW object instead of changing the old one ("immutability").
+  const updated: Doubt = {
+    ...original,
+    status: "answered",
+    reply: { mentorName, text, repliedAt: new Date().toISOString() },
+  };
+  save(list.map((d) => (d.id === id ? updated : d)));
+  return updated;
+}
+
+// Empties the fake queue. Used by tests and the "Clear all" buttons on dev pages.
+export function resetMockDoubts() {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(MOCK_STORAGE_KEY);
+  }
+}
+```
+
+**3. Build the single entry point:** `api/doubtApi.ts`. These three functions are the **only** way the app talks to the doubt queue. No component imports `mockDoubtApi` directly; the dev pages' "Clear all" button using `resetMockDoubts` is the one exception.
+```ts
+import type { Doubt } from "@/types/doubt";
+import { mockCreateDoubt, mockListDoubts, mockReplyToDoubt } from "./mockDoubtApi";
+
+// The backend isn't ready yet, so we use the mock. When it's ready, this becomes
+// false and NEXT_PUBLIC_API_URL gets set. No component has to change.
+export const USE_MOCK = true;
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+export async function listDoubts(): Promise<Doubt[]> {
+  if (USE_MOCK) return mockListDoubts();
+  const res = await fetch(`${BASE_URL}/api/doubts`);
+  if (!res.ok) throw new Error("Could not load doubts");
+  return res.json();
+}
+
+export async function createDoubt(question: string, learnerName: string): Promise<Doubt> {
+  if (USE_MOCK) return mockCreateDoubt(question, learnerName);
+  const res = await fetch(`${BASE_URL}/api/doubts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, learnerName }),
+  });
+  if (!res.ok) throw new Error("Could not send doubt");
+  return res.json();
+}
+
+export async function replyToDoubt(id: string, text: string, mentorName: string): Promise<Doubt> {
+  if (USE_MOCK) return mockReplyToDoubt(id, text, mentorName);
+  const res = await fetch(`${BASE_URL}/api/doubts/${id}/reply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, mentorName }),
+  });
+  if (!res.ok) throw new Error("Could not send reply");
+  return res.json();
+}
+```
+If `.env.example` doesn't already have it, add `NEXT_PUBLIC_API_URL=` (the name only). Write the two API test files below, then **commit, push, open PR #1 and post in the channel.**
+
+**4. Build the card:** `app/components/mentor-mode/DoubtCard.tsx`. It takes props only and is reused by both views. `break-words` stops a very long question from breaking the layout.
+```tsx
+import type { Doubt } from "@/types/doubt";
+
+type DoubtCardProps = {
+  doubt: Doubt;
+};
+
+export default function DoubtCard({ doubt }: DoubtCardProps) {
+  const answered = doubt.status === "answered";
+
+  return (
+    <article className="space-y-3 rounded-2xl border-4 border-ink bg-white p-4 shadow-[6px_6px_0_#172A32]">
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 break-words font-bold text-ink">{doubt.question}</p>
+        <span
+          className={`shrink-0 rounded-full border-2 border-ink px-3 py-1 font-display text-xs font-bold text-ink ${
+            answered ? "bg-tealpop" : "bg-cream"
+          }`}
+        >
+          {answered ? "Answered" : "Open"}
+        </span>
+      </div>
+
+      <p className="text-xs text-taskgray">Asked by {doubt.learnerName}</p>
+
+      {/* Show the reply if there is one, otherwise a waiting message. */}
+      {doubt.reply ? (
+        <div className="rounded-xl border-2 border-ink bg-cream p-3 text-sm text-ink">
+          <p className="font-display font-bold">{doubt.reply.mentorName} says:</p>
+          <p className="break-words">{doubt.reply.text}</p>
+        </div>
+      ) : (
+        <p className="text-sm text-taskgray">Waiting for a mentor to reply...</p>
+      )}
+    </article>
+  );
+}
+```
+
+**5. Add the scratch route:** `app/dev/doubt-card-test/page.tsx`
+```tsx
+import DoubtCard from "@/app/components/mentor-mode/DoubtCard";
+import type { Doubt } from "@/types/doubt";
+
+const OPEN_DOUBT: Doubt = {
+  id: "1",
+  learnerName: "Test Learner",
+  question: "How do I stop an infinite loop?",
+  status: "open",
+  createdAt: "2026-10-02T10:00:00.000Z",
+};
+
+const ANSWERED_DOUBT: Doubt = {
+  id: "2",
+  learnerName: "Test Learner",
+  question: "What is a variable?",
+  status: "answered",
+  createdAt: "2026-10-02T09:00:00.000Z",
+  reply: {
+    mentorName: "Test Mentor",
+    text: "A variable is a named box that stores a value.",
+    repliedAt: "2026-10-02T09:30:00.000Z",
+  },
+};
+
+const LONG_DOUBT: Doubt = {
+  ...OPEN_DOUBT,
+  id: "3",
+  question: "Whyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy does my code ".repeat(8),
+};
+
+export default function DoubtCardTestPage() {
+  return (
+    <main className="min-h-screen bg-cream p-8">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <h1 className="font-display text-3xl font-bold text-ink">DoubtCard Test</h1>
+        <DoubtCard doubt={OPEN_DOUBT} />
+        <DoubtCard doubt={ANSWERED_DOUBT} />
+        <DoubtCard doubt={LONG_DOUBT} />
+      </div>
+    </main>
+  );
+}
+```
+
+### Tests to write
+
+`api/mockDoubtApi.test.ts`
+```ts
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  MOCK_DELAY_MS,
+  MOCK_STORAGE_KEY,
+  mockCreateDoubt,
+  mockListDoubts,
+  mockReplyToDoubt,
+  resetMockDoubts,
+} from "./mockDoubtApi";
+
+// Fake timers let us skip the 400ms wait instead of really waiting.
+async function run<T>(promise: Promise<T>): Promise<T> {
+  await vi.advanceTimersByTimeAsync(MOCK_DELAY_MS);
+  return promise;
+}
+
+describe("mock doubt queue", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetMockDoubts(); // every test starts with an empty queue
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("starts empty", async () => {
+    expect(await run(mockListDoubts())).toEqual([]);
+  });
+
+  it("creates an open doubt with no reply", async () => {
+    const doubt = await run(mockCreateDoubt("How do I stop an infinite loop?", "Test Learner"));
+    expect(doubt.status).toBe("open");
+    expect(doubt.question).toBe("How do I stop an infinite loop?");
+    expect(doubt.learnerName).toBe("Test Learner");
+    expect(doubt.reply).toBeUndefined();
+    expect(await run(mockListDoubts())).toEqual([doubt]);
+  });
+
+  it("gives every doubt a different id", async () => {
+    const a = await run(mockCreateDoubt("First question", "Test Learner"));
+    const b = await run(mockCreateDoubt("Second question", "Test Learner"));
+    expect(a.id).not.toBe(b.id);
+  });
+
+  it("a reply marks the doubt answered and attaches the reply", async () => {
+    const doubt = await run(mockCreateDoubt("What is a variable?", "Test Learner"));
+    const updated = await run(mockReplyToDoubt(doubt.id, "A named box for a value.", "Test Mentor"));
+
+    expect(updated.status).toBe("answered");
+    expect(updated.reply?.text).toBe("A named box for a value.");
+    expect(updated.reply?.mentorName).toBe("Test Mentor");
+
+    const [saved] = await run(mockListDoubts());
+    expect(saved.status).toBe("answered");
+  });
+
+  it("saves to localStorage so data survives a reload", async () => {
+    await run(mockCreateDoubt("Saved question", "Test Learner"));
+    expect(window.localStorage.getItem(MOCK_STORAGE_KEY)).toContain("Saved question");
+  });
+
+  it("rejects a reply to a doubt that does not exist", async () => {
+    const promise = mockReplyToDoubt("does-not-exist", "Hello", "Test Mentor");
+    const assertion = expect(promise).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(MOCK_DELAY_MS);
+    await assertion;
+  });
+});
+```
+
+`api/doubtApi.test.ts`
+```ts
+import { describe, expect, it, vi } from "vitest";
+import { createDoubt, listDoubts, replyToDoubt } from "./doubtApi";
+import { mockCreateDoubt, mockListDoubts, mockReplyToDoubt } from "./mockDoubtApi";
+
+// Replace the mock queue with instant fakes so we can check they were called.
+vi.mock("./mockDoubtApi", () => ({
+  mockListDoubts: vi.fn(async () => []),
+  mockCreateDoubt: vi.fn(async () => ({})),
+  mockReplyToDoubt: vi.fn(async () => ({})),
+}));
+
+describe("doubtApi (USE_MOCK = true)", () => {
+  it("sends every call to the mock and never to the network", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await listDoubts();
+    await createDoubt("Question?", "Test Learner");
+    await replyToDoubt("id-1", "Answer.", "Test Mentor");
+
+    expect(mockListDoubts).toHaveBeenCalled();
+    expect(mockCreateDoubt).toHaveBeenCalledWith("Question?", "Test Learner");
+    expect(mockReplyToDoubt).toHaveBeenCalledWith("id-1", "Answer.", "Test Mentor");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+```
+
+`app/components/mentor-mode/DoubtCard.test.tsx`
+```tsx
+import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import type { Doubt } from "@/types/doubt";
+import DoubtCard from "./DoubtCard";
+
+const OPEN: Doubt = {
+  id: "1",
+  learnerName: "Test Learner",
+  question: "How do I stop an infinite loop?",
+  status: "open",
+  createdAt: "2026-10-02T10:00:00.000Z",
+};
+
+const ANSWERED: Doubt = {
+  ...OPEN,
+  status: "answered",
+  reply: { mentorName: "Test Mentor", text: "Make the condition false.", repliedAt: "2026-10-02T11:00:00.000Z" },
+};
+
+describe("DoubtCard", () => {
+  it("shows an open doubt with a cream Open badge and a waiting message", () => {
+    render(<DoubtCard doubt={OPEN} />);
+    expect(screen.getByText("How do I stop an infinite loop?")).toBeInTheDocument();
+    expect(screen.getByText("Open")).toHaveClass("bg-cream");
+    expect(screen.getByText("Waiting for a mentor to reply...")).toBeInTheDocument();
+  });
+
+  it("shows an answered doubt with a teal Answered badge and the mentor's reply", () => {
+    render(<DoubtCard doubt={ANSWERED} />);
+    expect(screen.getByText("Answered")).toHaveClass("bg-tealpop");
+    expect(screen.getByText("Test Mentor says:")).toBeInTheDocument();
+    expect(screen.getByText("Make the condition false.")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for a mentor to reply...")).not.toBeInTheDocument();
+  });
+
+  it("shows who asked", () => {
+    render(<DoubtCard doubt={OPEN} />);
+    expect(screen.getByText("Asked by Test Learner")).toBeInTheDocument();
+  });
+});
+```
+
+### How to check it
+1. `npx vitest run`: your 3 test files pass.
+2. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+3. `npm run dev` → open http://localhost:3000/dev/doubt-card-test and check:
+   - A cream "Open" card with "Waiting for a mentor to reply...".
+   - A teal "Answered" card with a "Test Mentor says:" box.
+   - A very long question that wraps inside its card instead of stretching the page.
+4. Shrink the window to phone width (Ctrl+Shift+M in DevTools, 375px). The badge stays on screen and nothing scrolls sideways.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `types/doubt.ts` matches the code above exactly (the other three tasks are written against it)
+- [ ] PR #1 (types + mock + API) merged early and announced
+- [ ] The mock saves to `localStorage` key `setuai_mock_doubts`, waits 400ms, and uses `crypto.randomUUID()` ids
+- [ ] Committed with `USE_MOCK = true` and `MOCK_FORCE_ERROR = false`
+- [ ] `DoubtCard` takes props only, uses brand tokens only, and wraps long text
+- [ ] `mockDoubtApi.test.ts`, `doubtApi.test.ts` and `DoubtCard.test.tsx` all pass
+- [ ] `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] `/dev/doubt-card-test` route kept
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 12 — ModeContext, ModeSwitch + the Mentor Mode Page
+
+**Goal:** Build:
+- A shared "current mode" that any component can read.
+- The Learner/Mentor pill switch that changes it.
+- The `/dev/mentor` page that ties the learner and mentor views together, plus the automated test of the **whole journey**.
+
+**What you'll achieve:**
+- Any component inside `<ModeProvider>` can call `useMode()` to get `{ mode, setMode }`.
+- The switch clearly shows which mode is on, and screen readers can tell.
+- `/dev/mentor` runs the full learner → mentor → learner journey, proven by a test.
+
+**Branch:** `feature/step7-task12-mode-switch` (steps 1–4). Later, a second branch `feature/step7-task12-mentor-page` for step 5.
+**Depends on:**
+- Task 11's PR #1 (types) for steps 1–4.
+- **Tasks 13 and 14 both merged** for step 5, the final page wiring and journey test. Until then, the page uses placeholders (step 3).
+
+**Blocks:** Nothing. Your page is the last piece.
+
+**Files owned:**
+- `context/ModeContext.tsx` and `context/ModeContext.test.tsx` (new)
+- `app/components/mentor-mode/ModeSwitch.tsx` and `ModeSwitch.test.tsx` (new)
+- `app/dev/mentor/page.tsx` and `app/dev/mentor/page.test.tsx` (new)
+
+### Steps
+
+**1. Build the shared mode:** `context/ModeContext.tsx`. A *context* is like a shared backpack: the `ModeProvider` fills it, and any component inside can read it with `useMode()` without the value being passed down through props.
+```tsx
+"use client";
+
+import { createContext, useContext, useState, type ReactNode } from "react";
+import type { Mode } from "@/types/doubt";
+
+type ModeContextValue = {
+  mode: Mode;
+  setMode: (mode: Mode) => void;
+};
+
+// null = "no provider above me". useMode() turns that into a clear error.
+const ModeContext = createContext<ModeContextValue | null>(null);
+
+type ModeProviderProps = {
+  children: ReactNode;
+  initialMode?: Mode; // defaults to "learner"
+};
+
+// Wrap a page in this so everything inside can read and change the mode.
+export function ModeProvider({ children, initialMode = "learner" }: ModeProviderProps) {
+  const [mode, setMode] = useState<Mode>(initialMode);
+  return <ModeContext.Provider value={{ mode, setMode }}>{children}</ModeContext.Provider>;
+}
+
+// The shortcut components use: const { mode, setMode } = useMode();
+export function useMode() {
+  const context = useContext(ModeContext);
+  if (!context) {
+    throw new Error("useMode must be used inside <ModeProvider>");
+  }
+  return context;
+}
+```
+
+**2. Build the switch:** `app/components/mentor-mode/ModeSwitch.tsx`. `aria-pressed` tells screen readers which option is on.
+```tsx
+"use client";
+
+import { useMode } from "@/context/ModeContext";
+import type { Mode } from "@/types/doubt";
+
+const OPTIONS: { value: Mode; label: string }[] = [
+  { value: "learner", label: "Learner" },
+  { value: "mentor", label: "Mentor" },
+];
+
+export default function ModeSwitch() {
+  const { mode, setMode } = useMode();
+
+  return (
+    <div
+      role="group"
+      aria-label="Switch mode"
+      className="inline-flex gap-1 rounded-full border-4 border-ink bg-white p-1 shadow-[4px_4px_0_#172A32]"
+    >
+      {OPTIONS.map((option) => {
+        const active = mode === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setMode(option.value)}
+            aria-pressed={active}
+            className={`rounded-full px-4 py-1 font-display text-sm font-bold text-ink transition-colors ${
+              active ? "bg-tealpop" : "hover:bg-cream"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+**3. Create the page with placeholders:** `app/dev/mentor/page.tsx`. Use this version until Tasks 13 and 14 are merged, so you can see the switch working now.
+```tsx
+"use client";
+
+import { ModeProvider, useMode } from "@/context/ModeContext";
+import ModeSwitch from "@/app/components/mentor-mode/ModeSwitch";
+
+function Screen() {
+  const { mode } = useMode();
+  // TEMPORARY placeholders. Replaced in step 5 once Tasks 13 and 14 are merged.
+  return (
+    <p className="font-display text-xl text-ink">
+      {mode === "learner" ? "Learner view goes here" : "Mentor view goes here"}
+    </p>
+  );
+}
+
+export default function MentorModePage() {
+  return (
+    <ModeProvider>
+      <main className="min-h-screen bg-cream px-4 py-10">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h1 className="font-display text-3xl font-bold text-ink">Mentor Mode</h1>
+            <ModeSwitch />
+          </div>
+          <Screen />
+        </div>
+      </main>
+    </ModeProvider>
+  );
+}
+```
+
+**4. Write `ModeContext.test.tsx` and `ModeSwitch.test.tsx`** (below), get them passing, and open your first PR.
+
+**5. Once Tasks 13 and 14 are merged, on a new branch from `main`:** replace `Screen` and the imports in `app/dev/mentor/page.tsx` so the file becomes:
+```tsx
+"use client";
+
+import { ModeProvider, useMode } from "@/context/ModeContext";
+import ModeSwitch from "@/app/components/mentor-mode/ModeSwitch";
+import MyDoubts from "@/app/components/mentor-mode/MyDoubts";
+import MentorDashboard from "@/app/components/mentor-mode/MentorDashboard";
+
+function Screen() {
+  const { mode } = useMode();
+  // Switching mode removes one view and mounts the other, and each view loads
+  // fresh data when it appears. That's how the learner sees a new reply right away.
+  return mode === "learner" ? <MyDoubts /> : <MentorDashboard />;
+}
+
+export default function MentorModePage() {
+  return (
+    <ModeProvider>
+      <main className="min-h-screen bg-cream px-4 py-10">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h1 className="font-display text-3xl font-bold text-ink">Mentor Mode</h1>
+            <ModeSwitch />
+          </div>
+          <Screen />
+        </div>
+      </main>
+    </ModeProvider>
+  );
+}
+```
+Then add the journey test `app/dev/mentor/page.test.tsx` (below) and open your second PR.
+
+### Tests to write
+
+`context/ModeContext.test.tsx`
+```tsx
+import { describe, expect, it, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { ModeProvider, useMode } from "./ModeContext";
+
+const wrapper = ({ children }: { children: ReactNode }) => <ModeProvider>{children}</ModeProvider>;
+
+describe("ModeContext", () => {
+  it("starts in learner mode", () => {
+    const { result } = renderHook(() => useMode(), { wrapper });
+    expect(result.current.mode).toBe("learner");
+  });
+
+  it("setMode switches the mode", () => {
+    const { result } = renderHook(() => useMode(), { wrapper });
+    act(() => result.current.setMode("mentor"));
+    expect(result.current.mode).toBe("mentor");
+  });
+
+  it("can start in a different mode", () => {
+    const { result } = renderHook(() => useMode(), {
+      wrapper: ({ children }) => <ModeProvider initialMode="mentor">{children}</ModeProvider>,
+    });
+    expect(result.current.mode).toBe("mentor");
+  });
+
+  it("throws a clear error when used outside ModeProvider", () => {
+    // React logs the thrown error to the console; hide that noise for this test.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => renderHook(() => useMode())).toThrow("useMode must be used inside <ModeProvider>");
+    spy.mockRestore();
+  });
+});
+```
+
+`app/components/mentor-mode/ModeSwitch.test.tsx`
+```tsx
+import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { ModeProvider, useMode } from "@/context/ModeContext";
+import ModeSwitch from "./ModeSwitch";
+
+// Prints the current mode so the test can check the switch really changed it.
+function ShowMode() {
+  const { mode } = useMode();
+  return <p>Current mode: {mode}</p>;
+}
+
+function renderSwitch() {
+  render(
+    <ModeProvider>
+      <ModeSwitch />
+      <ShowMode />
+    </ModeProvider>
+  );
+}
+
+describe("ModeSwitch", () => {
+  it("shows Learner as pressed by default", () => {
+    renderSwitch();
+    expect(screen.getByRole("button", { name: "Learner" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Mentor" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("switches to mentor and back when clicked", async () => {
+    const user = userEvent.setup();
+    renderSwitch();
+
+    await user.click(screen.getByRole("button", { name: "Mentor" }));
+    expect(screen.getByText("Current mode: mentor")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mentor" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Learner" }));
+    expect(screen.getByText("Current mode: learner")).toBeInTheDocument();
+  });
+
+  it("is labelled as a group for screen readers", () => {
+    renderSwitch();
+    expect(screen.getByRole("group", { name: "Switch mode" })).toBeInTheDocument();
+  });
+});
+```
+
+`app/dev/mentor/page.test.tsx` (step 5 only). This test uses the **real** mock queue, with its real 400ms delays, so it proves all four tasks work together:
+```tsx
+import { beforeEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { resetMockDoubts } from "@/api/mockDoubtApi";
+import MentorModePage from "./page";
+
+// Each step waits on the 400ms mock, so give findBy* a little longer than its 1s default.
+const WAIT = { timeout: 3000 };
+const QUESTION = "How do I stop an infinite loop?";
+const REPLY = "Make sure the loop condition eventually becomes false.";
+
+describe("Mentor Mode page: full journey", () => {
+  beforeEach(() => resetMockDoubts());
+
+  it("learner asks → mentor replies → learner sees the reply", async () => {
+    const user = userEvent.setup();
+    render(<MentorModePage />);
+
+    // 1. Learner sends a doubt
+    await user.type(screen.getByLabelText("Ask a doubt"), QUESTION);
+    await user.click(screen.getByRole("button", { name: "Send doubt" }));
+    expect(await screen.findByText("Doubt sent! A mentor will reply soon.", {}, WAIT)).toBeInTheDocument();
+    expect(await screen.findByText("Open", {}, WAIT)).toBeInTheDocument();
+
+    // 2. Mentor sees it in Open (1) and replies
+    await user.click(screen.getByRole("button", { name: "Mentor" }));
+    expect(await screen.findByRole("button", { name: "Open (1)" }, WAIT)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(`Reply to: ${QUESTION}`), REPLY);
+    await user.click(screen.getByRole("button", { name: "Send reply" }));
+    expect(await screen.findByRole("button", { name: "Answered (1)" }, WAIT)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open (0)" })).toBeInTheDocument();
+
+    // 3. Learner sees the doubt answered, with the reply
+    await user.click(screen.getByRole("button", { name: "Learner" }));
+    expect(await screen.findByText("Test Mentor says:", {}, WAIT)).toBeInTheDocument();
+    expect(screen.getByText(REPLY)).toBeInTheDocument();
+    expect(screen.getByText("Answered")).toBeInTheDocument();
+  }, 15000); // the whole journey takes a few seconds of mock delays
+});
+```
+
+### How to check it
+1. `npx vitest run`: your test files pass.
+2. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+3. After step 3: open http://localhost:3000/dev/mentor. Clicking Learner/Mentor swaps the placeholder text, and the active pill is teal.
+4. After step 5: run the full journey by hand at `/dev/mentor`:
+   1. In Learner mode type `How do I stop an infinite loop?` and press Send doubt. You see "Doubt sent!" and a cream **Open** card.
+   2. Click **Mentor**. The tab says **Open (1)** and shows the doubt with a reply box.
+   3. Type a reply and press **Send reply**. It moves to **Answered (1)**.
+   4. Click **Learner**. The same card is now teal **Answered** and shows "Test Mentor says: …".
+   5. **Reload the page.** The doubt and reply are still there. F12 console: no red errors.
+
+### Acceptance Criteria / Definition of Done
+- [ ] `useMode()` returns `{ mode, setMode }` and throws "useMode must be used inside <ModeProvider>" outside the provider
+- [ ] `ModeSwitch` uses `aria-pressed` + `role="group"`, brand tokens only, and the active option is teal
+- [ ] `/dev/mentor` switches between `MyDoubts` and `MentorDashboard` (after step 5)
+- [ ] `ModeContext.test.tsx`, `ModeSwitch.test.tsx` and `page.test.tsx` all pass
+- [ ] `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] Both PR descriptions say: "Mode switch is UI-only; real mentor role check still needed"
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 13 — Learner Side: AskDoubtForm + MyDoubts
+
+**Goal:** Build the learner's side: a form to ask a doubt, and a **My doubts** list that shows each doubt's status and the mentor's reply once there is one.
+
+**What you'll achieve:** A learner can type a question and send it, with validation, a "Sending..." state, and clear success and error messages. They then see it in **My doubts** (newest first) as Open, and later as Answered with the reply. Double-clicking Send never creates two doubts.
+
+**Branch:** `feature/step7-task13-learner-side`
+**Depends on:** Task 11's PR #1 (types + `doubtApi`) for the form, and Task 11's PR #2 (`DoubtCard`) for the list. You can write `AskDoubtForm` as soon as PR #1 is merged.
+**Blocks:** Task 12's final page wiring (step 5). Post in the channel when you're merged.
+
+**Files owned:**
+- `app/components/mentor-mode/AskDoubtForm.tsx` and `AskDoubtForm.test.tsx` (new)
+- `app/components/mentor-mode/MyDoubts.tsx` and `MyDoubts.test.tsx` (new)
+- `app/dev/learner-doubts-test/page.tsx` (new)
+
+### Steps
+
+**1. Build the form:** `app/components/mentor-mode/AskDoubtForm.tsx`
+```tsx
+"use client";
+
+import { useRef, useState } from "react";
+import { createDoubt } from "@/api/doubtApi";
+
+// Until login is wired in, every doubt is sent as this test learner.
+export const TEST_LEARNER_NAME = "Test Learner";
+
+// Shorter than this and the question is probably not useful to a mentor.
+const MIN_QUESTION_LENGTH = 5;
+
+type AskDoubtFormProps = {
+  onSent: () => void; // tells the parent "a doubt was sent, reload your list"
+};
+
+type Message = { text: string; isError: boolean };
+
+export default function AskDoubtForm({ onSent }: AskDoubtFormProps) {
+  const [question, setQuestion] = useState("");
+  const [sending, setSending] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  // Stops a very fast double-click from sending two doubts. A ref changes
+  // instantly; state only changes on the next render.
+  const inFlight = useRef(false);
+
+  async function handleSend() {
+    if (inFlight.current) return;
+
+    const trimmed = question.trim();
+    if (trimmed.length < MIN_QUESTION_LENGTH) {
+      setMessage({ text: "Please describe your doubt in a few words.", isError: true });
+      return;
+    }
+
+    inFlight.current = true;
+    setSending(true);
+    setMessage(null);
+    try {
+      await createDoubt(trimmed, TEST_LEARNER_NAME);
+      setQuestion(""); // clear the box only when it worked
+      setMessage({ text: "Doubt sent! A mentor will reply soon.", isError: false });
+      onSent();
+    } catch {
+      // Keep their text so they don't lose it.
+      setMessage({ text: "We could not send your doubt. Please try again.", isError: true });
+    } finally {
+      // "finally" always runs, success or failure, so "sending" can never get stuck on.
+      inFlight.current = false;
+      setSending(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3 rounded-2xl border-4 border-ink bg-white p-4 shadow-[8px_8px_0_#172A32] sm:p-6">
+      <label htmlFor="ask-doubt" className="font-display text-lg font-bold text-ink">
+        Ask a doubt
+      </label>
+      <textarea
+        id="ask-doubt"
+        className="h-28 w-full resize-y rounded-xl border-2 border-ink bg-cream p-3 text-ink placeholder:text-taskgray focus:outline-none focus:ring-2 focus:ring-tealpop disabled:opacity-60"
+        placeholder="What are you stuck on?"
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        disabled={sending}
+      />
+      <button
+        type="button"
+        onClick={handleSend}
+        disabled={sending}
+        className="rounded-2xl border-4 border-ink bg-tealpop px-6 py-2 font-display text-lg font-bold text-ink shadow-[4px_4px_0_#172A32] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+      >
+        {sending ? "Sending..." : "Send doubt"}
+      </button>
+      {message && (
+        <p
+          role="status"
+          className={`text-sm font-bold text-ink ${
+            message.isError ? "rounded-xl border-2 border-coral bg-cream p-2" : ""
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
+    </section>
+  );
+}
+```
+
+**2. Build the list:** `app/components/mentor-mode/MyDoubts.tsx`. It loads doubts when it first appears, and again whenever `reloadKey` changes. The form bumps `reloadKey` after sending. **Keep this exact loading pattern:** the shorter `useEffect(() => { refresh(); }, [])` fails this project's lint rules.
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { listDoubts } from "@/api/doubtApi";
+import type { Doubt } from "@/types/doubt";
+import AskDoubtForm from "./AskDoubtForm";
+import DoubtCard from "./DoubtCard";
+
+export default function MyDoubts() {
+  const [doubts, setDoubts] = useState<Doubt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  // Bump this number to reload the list (e.g. after sending a doubt).
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    // If the component disappears before the data arrives, ignore the late answer.
+    let ignore = false;
+
+    listDoubts()
+      .then((list) => {
+        if (ignore) return;
+        setDoubts(list);
+        setError("");
+      })
+      .catch(() => {
+        if (!ignore) setError("We could not load your doubts. Please refresh the page.");
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [reloadKey]); // runs on first render, and again whenever reloadKey changes
+
+  // Newest first, so a doubt you just sent appears at the top.
+  const newestFirst = [...doubts].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  return (
+    <div className="space-y-6">
+      <AskDoubtForm onSent={() => setReloadKey((key) => key + 1)} />
+
+      <h2 className="font-display text-xl font-bold text-ink">My doubts</h2>
+
+      {loading && <p className="text-taskgray">Loading your doubts...</p>}
+
+      {error && (
+        <p className="rounded-xl border-2 border-coral bg-white p-3 font-bold text-ink">{error}</p>
+      )}
+
+      {!loading && !error && newestFirst.length === 0 && (
+        <p className="text-taskgray">No doubts yet. Ask your first one above!</p>
+      )}
+
+      <div className="space-y-4">
+        {newestFirst.map((doubt) => (
+          <DoubtCard key={doubt.id} doubt={doubt} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+**3. Add the scratch route:** `app/dev/learner-doubts-test/page.tsx`
+```tsx
+"use client";
+
+import { useState } from "react";
+import { resetMockDoubts } from "@/api/mockDoubtApi";
+import MyDoubts from "@/app/components/mentor-mode/MyDoubts";
+
+export default function LearnerDoubtsTestPage() {
+  // Changing the key throws away the old MyDoubts and mounts a fresh one (which reloads).
+  const [version, setVersion] = useState(0);
+
+  function clearAll() {
+    resetMockDoubts();
+    setVersion((v) => v + 1);
+  }
+
+  return (
+    <main className="min-h-screen bg-cream px-4 py-10">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="font-display text-3xl font-bold text-ink">Learner Doubts Test</h1>
+          <button type="button" onClick={clearAll} className="rounded-full border-2 border-ink bg-white px-4 py-1 font-bold text-ink">
+            Clear all doubts
+          </button>
+        </div>
+        <MyDoubts key={version} />
+      </div>
+    </main>
+  );
+}
+```
+
+
+
+
+
+
+**4. Mascot polish (optional; only after everything above passes).** When at least one of the learner's doubts is answered, show Nova with a nudge. `NovaBanner` already exists and takes exactly `message` and `onDismiss`. In `MyDoubts.tsx`:
+- Add `import NovaBanner from "@/app/components/mascots/NovaBanner";`
+- Add `const hasReply = doubts.some((d) => d.status === "answered");`
+- Render `{hasReply && <NovaBanner message="A mentor replied to your doubt!" onDismiss={() => {}} />}` just above the `My doubts` heading.
+- If your tests start failing on images, add this to the top of `MyDoubts.test.tsx`:
+  ```tsx
+  vi.mock("next/image", () => ({
+    default: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
+  }));
+  ```
+
+### Tests to write
+
+`app/components/mentor-mode/AskDoubtForm.test.tsx`
+```tsx
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createDoubt } from "@/api/doubtApi";
+import type { Doubt } from "@/types/doubt";
+import AskDoubtForm from "./AskDoubtForm";
+
+vi.mock("@/api/doubtApi", () => ({ createDoubt: vi.fn() }));
+const mockedCreate = vi.mocked(createDoubt);
+
+const SENT: Doubt = {
+  id: "1",
+  learnerName: "Test Learner",
+  question: "How do I stop an infinite loop?",
+  status: "open",
+  createdAt: "2026-10-02T10:00:00.000Z",
+};
+
+describe("AskDoubtForm", () => {
+  beforeEach(() => mockedCreate.mockReset());
+
+  it("asks for more detail and sends nothing when the question is too short", async () => {
+    const user = userEvent.setup();
+    render(<AskDoubtForm onSent={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("Ask a doubt"), "hey");
+    await user.click(screen.getByRole("button", { name: "Send doubt" }));
+
+    expect(screen.getByText("Please describe your doubt in a few words.")).toBeInTheDocument();
+    expect(mockedCreate).not.toHaveBeenCalled();
+  });
+
+  it("sends the trimmed question, clears the box, confirms, and tells the parent", async () => {
+    mockedCreate.mockResolvedValue(SENT);
+    const onSent = vi.fn();
+    const user = userEvent.setup();
+    render(<AskDoubtForm onSent={onSent} />);
+
+    await user.type(screen.getByLabelText("Ask a doubt"), "  How do I stop an infinite loop?  ");
+    await user.click(screen.getByRole("button", { name: "Send doubt" }));
+
+    expect(await screen.findByText("Doubt sent! A mentor will reply soon.")).toBeInTheDocument();
+    expect(mockedCreate).toHaveBeenCalledWith("How do I stop an infinite loop?", "Test Learner");
+    expect(screen.getByLabelText("Ask a doubt")).toHaveValue("");
+    expect(onSent).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a friendly error and keeps the text when sending fails", async () => {
+    mockedCreate.mockRejectedValue(new Error("boom"));
+    const onSent = vi.fn();
+    const user = userEvent.setup();
+    render(<AskDoubtForm onSent={onSent} />);
+
+    await user.type(screen.getByLabelText("Ask a doubt"), "Why is my loop endless?");
+    await user.click(screen.getByRole("button", { name: "Send doubt" }));
+
+    expect(await screen.findByText("We could not send your doubt. Please try again.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ask a doubt")).toHaveValue("Why is my loop endless?");
+    expect(onSent).not.toHaveBeenCalled();
+  });
+
+  it('shows "Sending..." and only sends once when clicked twice', async () => {
+    mockedCreate.mockReturnValue(new Promise(() => {})); // never finishes, so we stay "sending"
+    const user = userEvent.setup();
+    render(<AskDoubtForm onSent={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("Ask a doubt"), "Why is my loop endless?");
+    await user.click(screen.getByRole("button", { name: "Send doubt" }));
+    await user.click(screen.getByRole("button", { name: "Sending..." }));
+
+    expect(screen.getByRole("button", { name: "Sending..." })).toBeDisabled();
+    expect(mockedCreate).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+`app/components/mentor-mode/MyDoubts.test.tsx`
+```tsx
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createDoubt, listDoubts } from "@/api/doubtApi";
+import type { Doubt } from "@/types/doubt";
+import MyDoubts from "./MyDoubts";
+
+vi.mock("@/api/doubtApi", () => ({ listDoubts: vi.fn(), createDoubt: vi.fn() }));
+const mockedList = vi.mocked(listDoubts);
+const mockedCreate = vi.mocked(createDoubt);
+
+const OLDER: Doubt = {
+  id: "1",
+  learnerName: "Test Learner",
+  question: "Older question",
+  status: "answered",
+  createdAt: "2026-10-01T10:00:00.000Z",
+  reply: { mentorName: "Test Mentor", text: "Here is the answer.", repliedAt: "2026-10-01T11:00:00.000Z" },
+};
+const NEWER: Doubt = {
+  id: "2",
+  learnerName: "Test Learner",
+  question: "Newer question",
+  status: "open",
+  createdAt: "2026-10-02T10:00:00.000Z",
+};
+
+describe("MyDoubts", () => {
+  beforeEach(() => {
+    mockedList.mockReset();
+    mockedCreate.mockReset();
+  });
+
+  it("shows a friendly empty message when there are no doubts", async () => {
+    mockedList.mockResolvedValue([]);
+    render(<MyDoubts />);
+    expect(await screen.findByText("No doubts yet. Ask your first one above!")).toBeInTheDocument();
+  });
+
+  it("lists doubts newest first, including the mentor's reply", async () => {
+    mockedList.mockResolvedValue([OLDER, NEWER]);
+    render(<MyDoubts />);
+
+    const cards = await screen.findAllByRole("article");
+    expect(cards[0]).toHaveTextContent("Newer question");
+    expect(cards[1]).toHaveTextContent("Older question");
+    expect(screen.getByText("Here is the answer.")).toBeInTheDocument();
+  });
+
+  it("shows a friendly error when the doubts cannot be loaded", async () => {
+    mockedList.mockRejectedValue(new Error("boom"));
+    render(<MyDoubts />);
+    expect(
+      await screen.findByText("We could not load your doubts. Please refresh the page.")
+    ).toBeInTheDocument();
+  });
+
+  it("reloads the list after a doubt is sent", async () => {
+    mockedList.mockResolvedValueOnce([]).mockResolvedValue([NEWER]);
+    mockedCreate.mockResolvedValue(NEWER);
+    const user = userEvent.setup();
+    render(<MyDoubts />);
+
+    await screen.findByText("No doubts yet. Ask your first one above!");
+    await user.type(screen.getByLabelText("Ask a doubt"), "Newer question");
+    await user.click(screen.getByRole("button", { name: "Send doubt" }));
+
+    expect(await screen.findByRole("article")).toHaveTextContent("Newer question");
+    expect(mockedList).toHaveBeenCalledTimes(2);
+  });
+});
+```
+
+### How to check it
+1. `npx vitest run`: your 2 test files pass.
+2. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+3. `npm run dev` → open http://localhost:3000/dev/learner-doubts-test:
+   1. Press **Clear all doubts**. You see "No doubts yet. Ask your first one above!".
+   2. Type `hey` and press Send. You get the "Please describe your doubt in a few words." message.
+   3. Type a real question and press Send. The button says "Sending..." briefly, then "Doubt sent!" appears, the box clears, and a cream **Open** card is at the top.
+   4. Double-click Send on a new question. Only **one** new card appears.
+   5. Paste a very long question (several paragraphs). The card wraps it and nothing stretches sideways.
+   6. Set `MOCK_FORCE_ERROR = true` in `api/mockDoubtApi.ts` and reload. You see the friendly "could not load" message. Try sending and you get the friendly "could not send" message. **Set it back to `false`. Don't commit it.**
+   7. Check at phone width (375px): everything is usable.
+
+### Acceptance Criteria / Definition of Done
+- [ ] Questions under 5 characters are blocked with a friendly message
+- [ ] "Sending..." while sending; the box clears only on success; text is kept on failure
+- [ ] A double-click sends only one doubt
+- [ ] My doubts is newest first, with friendly loading / empty / error states
+- [ ] Answered doubts show the mentor's reply (via `DoubtCard`)
+- [ ] Data loading uses the `reloadKey` pattern exactly (lint passes)
+- [ ] `AskDoubtForm.test.tsx` and `MyDoubts.test.tsx` pass; `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] `/dev/learner-doubts-test` route kept
+
+---
+
+## TASK 14 — Mentor Side: MentorDashboard + ReplyForm
+
+**Goal:** Build the mentor's side: a dashboard with **Open** and **Answered** tabs (with counts), open doubts oldest first so the learner who waited longest is helped first, and a reply box under each open doubt.
+
+**What you'll achieve:**
+- A mentor sees how many doubts are waiting.
+- They can reply to any open doubt, and the doubt immediately moves to Answered.
+- If something fails they get a clear message, never a blank screen.
+
+**Branch:** `feature/step7-task14-mentor-side`
+**Depends on:** Task 11's PR #1 (types + `doubtApi`) and PR #2 (`DoubtCard`). You can write `ReplyForm` before PR #2, because it doesn't use `DoubtCard`.
+**Blocks:** Task 12's final page wiring (step 5). Post in the channel when you're merged.
+
+**Files owned:**
+- `app/components/mentor-mode/ReplyForm.tsx` and `ReplyForm.test.tsx` (new)
+- `app/components/mentor-mode/MentorDashboard.tsx` and `MentorDashboard.test.tsx` (new)
+- `app/dev/mentor-dashboard-test/page.tsx` (new)
+
+### Steps
+
+**1. Build the reply box:** `app/components/mentor-mode/ReplyForm.tsx`. It knows nothing about the API. It just calls `onSend(text)`, and the dashboard decides what that does. That keeps it easy to test and reuse.
+```tsx
+"use client";
+
+import { useRef, useState } from "react";
+
+type ReplyFormProps = {
+  replyTo: string; // the question being answered, used for the accessible label
+  onSend: (text: string) => Promise<void>; // should throw if sending failed
+};
+
+export default function ReplyForm({ replyTo, onSend }: ReplyFormProps) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const inFlight = useRef(false); // blocks a double-click from sending twice
+
+  async function handleSend() {
+    const trimmed = text.trim();
+    if (!trimmed || inFlight.current) return;
+
+    inFlight.current = true;
+    setSending(true);
+    setError("");
+    try {
+      await onSend(trimmed);
+      setText("");
+    } catch {
+      setError("We could not send your reply. Please try again."); // keep their text
+    } finally {
+      inFlight.current = false;
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Stacks on phones, sits side by side on wider screens. */}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="text"
+          aria-label={`Reply to: ${replyTo}`}
+          className="min-w-0 flex-1 rounded-xl border-2 border-ink bg-cream p-2 text-ink placeholder:text-taskgray focus:outline-none focus:ring-2 focus:ring-tealpop disabled:opacity-60"
+          placeholder="Write a reply..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={sending}
+        />
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={sending || text.trim() === ""}
+          className="rounded-2xl border-4 border-ink bg-tealpop px-4 py-2 font-display font-bold text-ink shadow-[4px_4px_0_#172A32] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+        >
+          {sending ? "Sending..." : "Send reply"}
+        </button>
+      </div>
+      {error && (
+        <p className="rounded-xl border-2 border-coral bg-cream p-2 text-sm font-bold text-ink">{error}</p>
+      )}
+    </div>
+  );
+}
+```
+
+**2. Build the dashboard:** `app/components/mentor-mode/MentorDashboard.tsx`. **Keep this exact loading pattern** (`useEffect` + `.then()` + `reloadKey`): the shorter `useEffect(() => { refresh(); }, [])` fails this project's lint rules.
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { listDoubts, replyToDoubt } from "@/api/doubtApi";
+import type { Doubt, DoubtStatus } from "@/types/doubt";
+import DoubtCard from "./DoubtCard";
+import ReplyForm from "./ReplyForm";
+
+// Until login is wired in, every reply is sent as this test mentor.
+export const TEST_MENTOR_NAME = "Test Mentor";
+
+const TABS: { value: DoubtStatus; label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "answered", label: "Answered" },
+];
+
+export default function MentorDashboard() {
+  const [doubts, setDoubts] = useState<Doubt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [tab, setTab] = useState<DoubtStatus>("open");
+  // Bump this number to reload the queue (e.g. after a reply).
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let ignore = false; // ignore a late answer if the dashboard has disappeared
+
+    listDoubts()
+      .then((list) => {
+        if (ignore) return;
+        setDoubts(list);
+        setError("");
+      })
+      .catch(() => {
+        if (!ignore) setError("We could not load the doubts. Please refresh the page.");
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [reloadKey]);
+
+  // Passed to each ReplyForm. If replyToDoubt throws, ReplyForm shows its own error.
+  async function sendReply(id: string, text: string) {
+    await replyToDoubt(id, text, TEST_MENTOR_NAME);
+    setReloadKey((key) => key + 1);
+  }
+
+  if (loading) return <p className="text-taskgray">Loading doubts...</p>;
+
+  if (error) {
+    return <p className="rounded-xl border-2 border-coral bg-white p-3 font-bold text-ink">{error}</p>;
+  }
+
+  // Only the selected tab, oldest first, so whoever waited longest is helped first.
+  const shown = doubts
+    .filter((d) => d.status === tab)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  return (
+    <div className="space-y-4">
+      <div role="group" aria-label="Filter doubts" className="flex flex-wrap gap-2">
+        {TABS.map((t) => {
+          const count = doubts.filter((d) => d.status === t.value).length;
+          const active = tab === t.value;
+          return (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setTab(t.value)}
+              aria-pressed={active}
+              className={`rounded-full border-2 border-ink px-4 py-1 font-display text-sm font-bold text-ink ${
+                active ? "bg-tealpop" : "bg-white hover:bg-cream"
+              }`}
+            >
+              {t.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {shown.length === 0 && <p className="text-taskgray">Nothing here yet.</p>}
+
+      <div className="space-y-6">
+        {shown.map((doubt) => (
+          <div key={doubt.id} className="space-y-2">
+            <DoubtCard doubt={doubt} />
+            {doubt.status === "open" && (
+              <ReplyForm replyTo={doubt.question} onSend={(text) => sendReply(doubt.id, text)} />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+**3. Add the scratch route:** `app/dev/mentor-dashboard-test/page.tsx`. It has buttons to add sample doubts and to clear the queue, so you can test without the learner side.
+```tsx
+"use client";
+
+import { useState } from "react";
+import { createDoubt } from "@/api/doubtApi";
+import { resetMockDoubts } from "@/api/mockDoubtApi";
+import MentorDashboard from "@/app/components/mentor-mode/MentorDashboard";
+
+const SAMPLE_QUESTIONS = [
+  "How do I stop an infinite loop?",
+  "What is the difference between = and ==?",
+  "Why does my function return undefined?",
+  "What does AI training data mean?",
+];
+
+export default function MentorDashboardTestPage() {
+  // Changing the key mounts a fresh MentorDashboard, which reloads the queue.
+  const [version, setVersion] = useState(0);
+  const [adding, setAdding] = useState(false);
+
+  async function addSample() {
+    setAdding(true);
+    const question = SAMPLE_QUESTIONS[Math.floor(Math.random() * SAMPLE_QUESTIONS.length)];
+    await createDoubt(question, "Sample Learner");
+    setAdding(false);
+    setVersion((v) => v + 1);
+  }
+
+  function clearAll() {
+    resetMockDoubts();
+    setVersion((v) => v + 1);
+  }
+
+  return (
+    <main className="min-h-screen bg-cream px-4 py-10">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <h1 className="font-display text-3xl font-bold text-ink">Mentor Dashboard Test</h1>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={addSample} disabled={adding} className="rounded-full border-2 border-ink bg-white px-4 py-1 font-bold text-ink disabled:opacity-50">
+            {adding ? "Adding..." : "Add sample doubt"}
+          </button>
+          <button type="button" onClick={clearAll} className="rounded-full border-2 border-ink bg-white px-4 py-1 font-bold text-ink">
+            Clear all doubts
+          </button>
+        </div>
+        <MentorDashboard key={version} />
+      </div>
+    </main>
+  );
+}
+```
+
+### Tests to write
+
+`app/components/mentor-mode/ReplyForm.test.tsx`
+```tsx
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import ReplyForm from "./ReplyForm";
+
+const LABEL = "Reply to: What is a variable?";
+
+describe("ReplyForm", () => {
+  it("keeps Send reply disabled until real text is typed", async () => {
+    const user = userEvent.setup();
+    render(<ReplyForm replyTo="What is a variable?" onSend={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Send reply" })).toBeDisabled();
+    await user.type(screen.getByLabelText(LABEL), "   ");
+    expect(screen.getByRole("button", { name: "Send reply" })).toBeDisabled();
+  });
+
+  it("sends the trimmed reply and clears the box", async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<ReplyForm replyTo="What is a variable?" onSend={onSend} />);
+
+    await user.type(screen.getByLabelText(LABEL), "  A named box for a value.  ");
+    await user.click(screen.getByRole("button", { name: "Send reply" }));
+
+    expect(onSend).toHaveBeenCalledWith("A named box for a value.");
+    expect(screen.getByLabelText(LABEL)).toHaveValue("");
+  });
+
+  it("shows a friendly error and keeps the text when sending fails", async () => {
+    const onSend = vi.fn().mockRejectedValue(new Error("boom"));
+    const user = userEvent.setup();
+    render(<ReplyForm replyTo="What is a variable?" onSend={onSend} />);
+
+    await user.type(screen.getByLabelText(LABEL), "A named box.");
+    await user.click(screen.getByRole("button", { name: "Send reply" }));
+
+    expect(await screen.findByText("We could not send your reply. Please try again.")).toBeInTheDocument();
+    expect(screen.getByLabelText(LABEL)).toHaveValue("A named box.");
+  });
+
+  it('shows "Sending..." and only sends once when clicked twice', async () => {
+    const onSend = vi.fn().mockReturnValue(new Promise(() => {})); // never finishes
+    const user = userEvent.setup();
+    render(<ReplyForm replyTo="What is a variable?" onSend={onSend} />);
+
+    await user.type(screen.getByLabelText(LABEL), "A named box.");
+    await user.click(screen.getByRole("button", { name: "Send reply" }));
+    await user.click(screen.getByRole("button", { name: "Sending..." }));
+
+    expect(screen.getByRole("button", { name: "Sending..." })).toBeDisabled();
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+`app/components/mentor-mode/MentorDashboard.test.tsx`
+```tsx
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { listDoubts, replyToDoubt } from "@/api/doubtApi";
+import type { Doubt } from "@/types/doubt";
+import MentorDashboard from "./MentorDashboard";
+
+vi.mock("@/api/doubtApi", () => ({ listDoubts: vi.fn(), replyToDoubt: vi.fn() }));
+const mockedList = vi.mocked(listDoubts);
+const mockedReply = vi.mocked(replyToDoubt);
+
+function makeDoubt(id: string, question: string, createdAt: string): Doubt {
+  return { id, learnerName: "Test Learner", question, status: "open", createdAt };
+}
+
+const NEWER_OPEN = makeDoubt("2", "Newer question", "2026-10-02T12:00:00.000Z");
+const OLDER_OPEN = makeDoubt("1", "Older question", "2026-10-02T09:00:00.000Z");
+const ANSWERED: Doubt = {
+  ...makeDoubt("3", "Answered question", "2026-10-01T09:00:00.000Z"),
+  status: "answered",
+  reply: { mentorName: "Test Mentor", text: "Already answered.", repliedAt: "2026-10-01T10:00:00.000Z" },
+};
+
+describe("MentorDashboard", () => {
+  beforeEach(() => {
+    mockedList.mockReset();
+    mockedReply.mockReset();
+  });
+
+  it("shows tab counts and open doubts oldest first", async () => {
+    mockedList.mockResolvedValue([NEWER_OPEN, ANSWERED, OLDER_OPEN]);
+    render(<MentorDashboard />);
+
+    expect(await screen.findByRole("button", { name: "Open (2)" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Answered (1)" })).toBeInTheDocument();
+
+    const cards = screen.getAllByRole("article");
+    expect(cards[0]).toHaveTextContent("Older question");
+    expect(cards[1]).toHaveTextContent("Newer question");
+  });
+
+  it("shows answered doubts with their reply and no reply box on the Answered tab", async () => {
+    mockedList.mockResolvedValue([OLDER_OPEN, ANSWERED]);
+    const user = userEvent.setup();
+    render(<MentorDashboard />);
+
+    await user.click(await screen.findByRole("button", { name: "Answered (1)" }));
+    expect(screen.getByText("Already answered.")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("sends a reply as Test Mentor and moves the doubt to Answered", async () => {
+    const answered: Doubt = {
+      ...OLDER_OPEN,
+      status: "answered",
+      reply: { mentorName: "Test Mentor", text: "Use break.", repliedAt: "2026-10-02T10:00:00.000Z" },
+    };
+    mockedList.mockResolvedValueOnce([OLDER_OPEN]).mockResolvedValue([answered]);
+    mockedReply.mockResolvedValue(answered);
+    const user = userEvent.setup();
+    render(<MentorDashboard />);
+
+    await user.type(await screen.findByLabelText("Reply to: Older question"), "Use break.");
+    await user.click(screen.getByRole("button", { name: "Send reply" }));
+
+    expect(mockedReply).toHaveBeenCalledWith("1", "Use break.", "Test Mentor");
+    expect(await screen.findByRole("button", { name: "Answered (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open (0)" })).toBeInTheDocument();
+    expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
+  });
+
+  it("shows a friendly message when the queue is empty", async () => {
+    mockedList.mockResolvedValue([]);
+    render(<MentorDashboard />);
+    expect(await screen.findByText("Nothing here yet.")).toBeInTheDocument();
+  });
+
+  it("shows a friendly error instead of a blank screen when loading fails", async () => {
+    mockedList.mockRejectedValue(new Error("boom"));
+    render(<MentorDashboard />);
+    expect(
+      await screen.findByText("We could not load the doubts. Please refresh the page.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the reply error when sending a reply fails", async () => {
+    mockedList.mockResolvedValue([OLDER_OPEN]);
+    mockedReply.mockRejectedValue(new Error("boom"));
+    const user = userEvent.setup();
+    render(<MentorDashboard />);
+
+    await user.type(await screen.findByLabelText("Reply to: Older question"), "Use break.");
+    await user.click(screen.getByRole("button", { name: "Send reply" }));
+
+    expect(await screen.findByText("We could not send your reply. Please try again.")).toBeInTheDocument();
+  });
+});
+```
+
+### How to check it
+1. `npx vitest run`: your 2 test files pass.
+2. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+3. `npm run dev` → open http://localhost:3000/dev/mentor-dashboard-test:
+   1. Press **Clear all doubts**. You see Open (0), Answered (0) and "Nothing here yet.".
+   2. Press **Add sample doubt** three times. You see **Open (3)** with the oldest at the top.
+   3. Reply to the middle one. It disappears from Open, and the tabs show **Open (2)** and **Answered (1)**.
+   4. Click **Answered (1)**. You see the doubt with "Test Mentor says: …" and no reply box.
+   5. Set `MOCK_FORCE_ERROR = true` in `api/mockDoubtApi.ts` and reload. You see the friendly "could not load" message, not a blank page. **Set it back to `false`. Don't commit it.**
+   6. Check at phone width (375px): the reply box and button stack and stay usable.
+
+### Acceptance Criteria / Definition of Done
+- [ ] Open / Answered tabs show correct counts; the active tab is teal with `aria-pressed`
+- [ ] Open doubts are listed oldest first
+- [ ] Each open doubt has its own reply box. Sending moves it to Answered, and replies are sent as "Test Mentor"
+- [ ] Friendly loading, empty, load-error and reply-error states; never a blank screen
+- [ ] A double-click sends only one reply
+- [ ] Data loading uses the `reloadKey` pattern exactly (lint passes)
+- [ ] `ReplyForm.test.tsx` and `MentorDashboard.test.tsx` pass; `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] `/dev/mentor-dashboard-test` route kept
+
+---
+
+
+
+
+
+
+
+
+
+
+
+## FINAL TASK (all four together, once Tasks 11–14 are merged) — Team Verification & Handoff
+
+**Goal:** Prove the whole learner ↔ mentor conversation works on `main`, then hand it over. Do this **together**, in one call or sitting. It is not one person's job.
+
+### Steps
+1. Everyone pulls the latest `main` and runs `npm install`.
+2. Run `npx vitest run`. All 9 Step 7 test files must pass, along with any earlier ones.
+3. Run `npx tsc --noEmit` and `npm run lint`. Both must be clean.
+4. Each owner opens **their own** scratch route and confirms it still works after the merge:
+   - Task 11: `/dev/doubt-card-test`
+   - Task 13: `/dev/learner-doubts-test`
+   - Task 14: `/dev/mentor-dashboard-test`
+5. Together, at **`/dev/mentor`**:
+   1. Clear old data first: DevTools → Application → Local Storage → delete `setuai_mock_doubts`.
+   2. Run the full journey from Task 12's "How to check it" step 4, including the reload.
+   3. Check at phone width.
+   4. Make sure there are no red console errors.
+6. If anything fails, the owner of that file fixes it on a new branch, **adds a test that would have caught it**, and opens a PR. Then repeat this checklist.
+7. Post a short handoff in the team channel:
+   - **Done:**
+     - The Learner/Mentor switch.
+     - Ask a doubt with validation.
+     - My doubts with replies.
+     - The mentor dashboard with Open/Answered tabs, oldest first.
+     - Friendly empty, loading and error states.
+     - Tests.
+   - **Mocked:** all doubts live in the browser's `localStorage` via `api/mockDoubtApi.ts` (`USE_MOCK = true`), because the backend `doubt_queue` endpoints aren't ready.
+   - **Still needed before launch:**
+     - A real mentor role check. The switch is UI-only today.
+     - Real learner and mentor names from login, replacing "Test Learner" and "Test Mentor".
+     - The learner's list showing only their own doubts.
+   - **Reusable:** `DoubtCard` and `ModeSwitch` (plus `ModeProvider`/`useMode` in `context/ModeContext.tsx`) live in `app/components/mentor-mode/`.
+
+**When the backend is ready (later, not part of these tickets):**
+1. Set `NEXT_PUBLIC_API_URL` in your local `.env`.
+2. Flip `USE_MOCK` to `false` in `api/doubtApi.ts`.
+3. Restart `npm run dev`.
+
+If the backend's field names differ, update `types/doubt.ts` first; TypeScript will point to everything else that needs changing.

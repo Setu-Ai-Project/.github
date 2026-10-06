@@ -129,13 +129,17 @@ export default function Home() {
     } catch (err) {
       console.error("Authentication error:", err);
 
-      const clerkErrors = isSignup
-        ? signUpErrors
-        : signInErrors;
+      // Sign-up and sign-in name the email field differently:
+      // sign-up uses "emailAddress", sign-in uses "identifier".
+      const emailError = isSignup
+        ? signUpErrors?.fields?.emailAddress?.message
+        : signInErrors?.fields?.identifier?.message;
 
-      const fieldError =
-        clerkErrors?.fields?.emailAddress?.message ||
-        clerkErrors?.fields?.password?.message;
+      const passwordError = isSignup
+        ? signUpErrors?.fields?.password?.message
+        : signInErrors?.fields?.password?.message;
+
+      const fieldError = emailError || passwordError;
 
       setError(
         fieldError ||
