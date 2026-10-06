@@ -9,14 +9,11 @@ Copy `.env.local.example` to `.env.local` and set `NEXT_PUBLIC_CLERK_PUBLISHABLE
 First, run the development server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
+
+This project uses **npm only** — don't use `pnpm`, `yarn` or `bun`, and only commit `package-lock.json`.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
@@ -41,6 +38,32 @@ olivernyirongo+clerk_test@example.com
 This also works with a real provider if you'd rather use one, e.g. `oliver+clerk_test@gmail.com` — Clerk intercepts based on the `+clerk_test` tag before the `@`, so the domain doesn't matter either way, nothing gets delivered.
 
 This doesn't count against Clerk's dev-instance monthly sending limits, so use it freely for local testing.
+
+## Running tests
+
+Tests use [Vitest](https://vitest.dev) and [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) in a fake browser (jsdom). Run these from `frontend/gamifiedsetu`:
+
+```bash
+npm test             # watch mode: re-runs tests when you save (press q to quit)
+npx vitest run       # run every test once
+npx vitest run app/components/submission   # run only the tests in one folder (or pass a single file)
+```
+
+Before opening a PR, all three checks must pass:
+
+```bash
+npx vitest run       # tests
+npx tsc --noEmit     # type check (no output = clean)
+npm run lint         # lint (0 errors; warnings are OK)
+```
+
+**Writing a test:**
+- Put it next to the file it tests, named `<Name>.test.ts` or `<Name>.test.tsx` (e.g. `StatusBadge.tsx` → `StatusBadge.test.tsx`).
+- `@/` imports work in tests the same as in the app.
+- Matchers like `toBeInTheDocument()`, `toBeDisabled()` and `toHaveValue()` are available everywhere.
+- `tests/smoke.test.tsx` is the simplest example to copy from.
+
+The setup lives in `vitest.config.mts` (jsdom, `@/` paths, React) and `vitest.setup.ts` (jest-dom matchers, cleanup after each test).
 
 ## Learn More
 
