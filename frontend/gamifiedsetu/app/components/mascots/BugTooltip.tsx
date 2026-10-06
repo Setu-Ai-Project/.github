@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface BugTooltipProps {
@@ -23,9 +24,9 @@ export default function BugTooltip({ message, onDismiss }: BugTooltipProps) {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
           transition={{ duration: 0.2 }}
-          className="relative flex items-center gap-3 rounded-xl bg-cream p-4 shadow-hard border-2 border-ink"
+          className="relative flex items-center gap-3 rounded-xl bg-cream p-4 shadow-[8px_8px_0_#172A32] border-2 border-ink"
         >
-          <img src="/mascots/bug-mascot.svg" alt="Bug" className="w-10 h-10" />
+          <Image src="/mascots/bug-mascot.svg" alt="Bug" width={40} height={40} className="w-10 h-10" />
           <p className="text-ink text-sm flex-1">{message}</p>
           <button
             onClick={() => {
@@ -44,9 +45,9 @@ export default function BugTooltip({ message, onDismiss }: BugTooltipProps) {
           initial={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
           transition={{ duration: 0.2 }}
-          className="relative flex items-center gap-3 rounded-xl bg-cream p-4 shadow-hard border-2 border-ink"
+          className="relative flex items-center gap-3 rounded-xl bg-cream p-4 shadow-[8px_8px_0_#172A32] border-2 border-ink"
         >
-          <img src="/mascots/bug-dismissed.svg" alt="Bug dismissed" className="w-10 h-10" />
+          <Image src="/mascots/bug-dismissed.svg" alt="Bug dismissed" width={40} height={40} className="w-10 h-10" />
           <p className="text-ink text-sm flex-1">{message}</p>
         </motion.div>
       )}
