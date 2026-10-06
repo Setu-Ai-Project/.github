@@ -22,7 +22,7 @@ export default function Home() {
     fetchStatus: signUpFetchStatus,
   } = useSignUp();
 
-  const [mode, setMode] = useState<Mode>("signup");
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
