@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
 from database import get_session
+from middleware.auth import get_current_user_id
 from models.user import User, UserCreate, UserRead
 from security import get_password_hash
 
@@ -32,6 +33,15 @@ def create_user(user_in: UserCreate, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(db_user)
     return db_user
+
+
+@router.get("/me")
+def get_my_clerk_identity(clerk_user_id: str = Depends(get_current_user_id)):
+    """Protected: returns the Clerk user id extracted from the verified token.
+
+    Registered before /{user_id} so "me" is never matched as a user_id path param.
+    """
+    return {"clerk_user_id": clerk_user_id}
 
 
 @router.get("/{user_id}", response_model=UserRead)

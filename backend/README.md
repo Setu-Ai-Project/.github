@@ -99,3 +99,38 @@ Tests run against an isolated in-memory SQLite database (not your local
 Postgres), so there's no setup needed beyond `pip install -r requirements.txt`
 — no running database required, and nothing you do in tests touches your
 real data.
+
+## Authentication
+
+Login is handled by [Clerk](https://clerk.com/) — the frontend has its own
+Clerk sign-in UI, and the backend's job is just to verify the token Clerk
+attaches to incoming requests.
+
+To protect a route, add `Depends(get_current_user_id)` from
+`middleware/auth.py`:
+
+```python
+from fastapi import Depends
+from middleware.auth import get_current_user_id
+
+@router.get("/something")
+def protected_route(clerk_user_id: str = Depends(get_current_user_id)):
+    ...
+```
+
+A request with no token (or an invalid one) gets a `401`; a valid one returns
+the Clerk user id (`payload["sub"]`) — a string like `user_...`, not our
+Postgres `users.id`. `GET /users/me` is the example protected route.
+
+You'll need these in your `.env` (see `.env.example`):
+
+- `CLERK_SECRET_KEY` — from the Clerk dashboard, same project as the
+  frontend's `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_JWT_KEY` — optional; leave blank to use Clerk's networked JWKS
+  verification instead of a local PEM key
+- `CLERK_AUTHORIZED_PARTIES` — comma-separated list of allowed frontend
+  origins (defaults to `http://localhost:3000`)
+
+To test manually end-to-end: sign in through the frontend, open the browser
+console and run `await window.Clerk.session.getToken()` to get a real token,
+then `curl -H "Authorization: Bearer <token>" http://127.0.0.1:8000/users/me`.
