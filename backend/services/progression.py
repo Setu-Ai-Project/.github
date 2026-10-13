@@ -12,6 +12,7 @@ from database import engine
 from models.challenge import Challenge
 from models.completed_challenge import CompletedChallenge
 from models.user import User
+from services.badges import check_and_award_badges
 
 
 class UserNotFound(Exception):
@@ -72,6 +73,9 @@ def _execute_award_xp(session: Session, user_id: int, challenge_id: int) -> dict
     user.level = new_level
     session.add(user)
 
+    # 4. Check and award any newly unlocked badges in the same transaction
+    badges_unlocked = check_and_award_badges(session, user)
+
     try:
         session.commit()
     except IntegrityError as exc:
@@ -117,7 +121,7 @@ def _execute_award_xp(session: Session, user_id: int, challenge_id: int) -> dict
         "previous_level": previous_level,
         "leveled_up": leveled_up,
         "xp_to_next_level": xp_to_next_level(user.total_xp),
-        "badges_unlocked": [],
+        "badges_unlocked": badges_unlocked,
         "already_completed": False,
     }
 
