@@ -1,8 +1,10 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlmodel import SQLModel
 
 from database import engine
+from realtime.manager import manager
 from models.user import User  # noqa: F401 - registers table with SQLModel metadata
 from models.module import Module  # noqa: F401 - registers table with SQLModel metadata
 from models.sub_module import SubModule  # noqa: F401 - registers table with SQLModel metadata
@@ -30,6 +32,7 @@ from routes import (
 async def lifespan(app: FastAPI):
     # Automatically create tables if they do not exist
     SQLModel.metadata.create_all(engine)
+    manager.loop = asyncio.get_running_loop()
     yield
 
 
