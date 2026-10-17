@@ -1,0 +1,681 @@
+# SetuAI Backend — Wave 3 Tickets (Step 6, Pair B2)
+
+## How to use this file
+
+- **Find your task** (Task 0, 1, 2 or 3). One person, one task, one PR. Each task lists every file to create or change, the exact names, messages and code shapes, and the tests. You never need to read another task to do yours.
+- **Working with an AI agent:** copy **two sections** into your agent:
+  1. the whole **Project context** section below (from its heading down to the `---` line), and
+  2. your whole task (from its `## TASK` heading down to the next `---` line).
+
+  Then add this instruction:
+  > Implement this ticket in my project. Create or change exactly the files listed, and no others. Follow every rule, and use the exact names, messages and code shapes given. Write the tests described, then run `python -m pytest -v` and fix anything that fails until the whole suite passes. If a file listed under "Files you use but don't edit" does not exist yet, do NOT create it: write your code against the interface given and tell me. Do not install packages, do not run git commands and do not touch `.env`.
+- **Then you are the reviewer of the agent's work:** read every file it wrote, ask it to explain anything you don't understand, run the checks in "Done when" yourself, and fix what fails. You own the result, not the agent.
+- The tasks run **in parallel** and plug together through the **Shared interfaces** table, which sits inside Project context so every agent sees it.
+
+## Project context (applies to every task — paste it with your task)
+
+**The project**
+- **App:** SetuAI, a gamified learning app. Backend root: `.github/backend/` (the folder with `main.py`). All paths below are relative to it. Run every command from this folder.
+- **Stack:** Python 3.11+, FastAPI, SQLModel (SQLAlchemy + Pydantic v2), PostgreSQL, pytest. Login is Clerk.
+- **Flat layout, no `app/` folder.** Imports have no `app.` prefix: `from models.user import User`, `from services.progression import award_xp`, `from database import get_session`. Never create an `app/` directory.
+- **Folders:** models in `models/`, routes in `routes/`, plain logic in `services/`, scripts in `scripts/` (run as `python -m scripts.<name>`), tests in `tests/test_<name>.py`, contracts in `docs/contracts/`.
+
+**Database**
+- **Model style** (copy `models/completed_challenge.py`): a `XxxBase(SQLModel)` with the shared fields, a table class `Xxx(XxxBase, table=True)` with `__tablename__` (plural, e.g. `"submissions"`) and `id: Optional[int] = Field(default=None, primary_key=True)`, plus `XxxCreate` / `XxxRead` classes. Datetimes use `default_factory=lambda: datetime.now(timezone.utc)`.
+- **Real table names:** `users`, `challenges`, `sub_modules`, `modules`. Foreign keys must say `"users.id"`, `"challenges.id"` and so on.
+- **Existing models you may need:**
+  - `User(name, email, hashed_password, total_xp=0, level=1, created_at)`
+  - `Module(title, description, order)`
+  - `SubModule(title, description, order, module_id)`
+  - `Challenge(sub_module_id, title, xp_reward=50)`, where every challenge needs a real sub-module.
+- **Tables are created by `SQLModel.metadata.create_all(engine)`** at startup in `main.py`, and a model is only created if `main.py` imports it. There is no Alembic. `create_all` creates **new tables** but **never adds columns to an existing table**, so a new column on an existing table needs a manual `ALTER TABLE` on every local Postgres.
+- **JSON columns:** `from sqlalchemy import Column, JSON`, then `Field(default_factory=list, sa_column=Column(JSON))`. Never change a JSON list or dict in place (`.append`), because SQLAlchemy won't notice. Always assign a new list.
+
+**Login (Clerk)**
+- `middleware/auth.py` → `get_current_user_id(request) -> str` returns the **Clerk id string** (like `"user_2abc"`), or raises 401. It is not our integer `users.id`. Task 0 adds `get_current_user`, which returns the `User` row.
+
+**XP (Pair B1, already on `main`, don't change it)**
+- `services/progression.py` → `award_xp(user_id: int, challenge_id: int) -> dict`. It returns a dict with `xp_awarded`, `total_xp`, `level`, `previous_level`, `leveled_up`, `xp_to_next_level`, `badges_unlocked` and `already_completed`.
+- It adds the challenge's `xp_reward` to the user, never awards the same challenge twice (it returns `xp_awarded: 0` the second time), and opens **its own** DB session.
+- `_execute_award_xp(session, user_id, challenge_id)` does the same thing using a session you give it (tests use this one).
+- Never write XP or level logic yourself.
+
+**Tests**
+- Tests run against an in-memory SQLite DB, never your Postgres. Fixtures in `tests/conftest.py`:
+  - `session`: a fresh, empty DB for each test.
+  - `client`: a FastAPI `TestClient` whose `get_session` returns that same `session`. It clears `app.dependency_overrides` after each test.
+- **Fake a logged-in user** in route tests:
+  ```python
+  from main import app
+  from middleware.auth import get_current_user
+
+  app.dependency_overrides[get_current_user] = lambda: user
+  ```
+- **Fake "not logged in":** don't override anything, call `monkeypatch.setenv("CLERK_SECRET_KEY", "sk_test_fake")` and send no `Authorization` header. You get 401 (see `tests/test_auth.py`).
+- **Building a challenge for a test** needs a Module → SubModule → Challenge chain (copy `_create_seed_data` in `tests/test_challenge_models.py`):
+  ```python
+  module = Module(title="M", description="d", order=1); session.add(module); session.commit(); session.refresh(module)
+  sub = SubModule(title="S", description="d", order=1, module_id=module.id); session.add(sub); session.commit(); session.refresh(sub)
+  challenge = Challenge(sub_module_id=sub.id, title="C", xp_reward=10); session.add(challenge); session.commit(); session.refresh(challenge)
+  ```
+
+**Setup and checks**
+- **Run tests:** `python -m pytest -v` with your virtual environment active (`venv\Scripts\activate` on Windows, `source venv/bin/activate` on Mac/Linux).
+- **Before every PR:** the **whole** suite passes, old tests and new.
+- **Packages:** none needed. Never install new ones. If one is ever truly needed, ask the team first and add it to `requirements.txt` in the same PR.
+
+**Shared interfaces.** All three tasks rely on these exact names; never rename one without telling the team.
+
+| Name | Import from | Shape | Built by |
+|---|---|---|---|
+| `SubmissionStatus.PENDING / PASSED / NEEDS_REVISION` | `models.submission` | the strings `"pending"`, `"passed"`, `"needs_revision"` | Task 1 |
+| `Submission` (table `submissions`) | `models.submission` | `id, user_id, challenge_id, answer_text, status, feedback: list[str], xp_awarded, attempt_number, created_at` | Task 1 |
+| `Challenge.rules` | `models.challenge` | `dict` (JSON), defaults to `{}` | Task 1 |
+| `get_current_user` | `middleware.auth` | FastAPI dependency → `User` (401 if not logged in) | Task 0 |
+| `verify_answer(answer_text, rules)` | `services.verifier` | → `VerificationResult(passed: bool, feedback: list[str])` | Task 2 |
+| `POST /submissions`, `GET /submissions`, `GET /submissions/{id}` | `routes.submissions` | JSON shape in `docs/contracts/step6_contract.md` | Task 2 writes the doc, Task 3 the code |
+| `award_xp(user_id, challenge_id) -> dict` | `services.progression` | see "XP" above | Pair B1 (done) |
+
+---
+
+## Team rules (for people, not agents)
+
+1. **Own branch, never `main`.** Before starting:
+   ```
+   git checkout main
+   git pull origin main
+   git checkout -b <branch name from your task>
+   pip install -r requirements.txt
+   python -m pytest -v      # must be all green BEFORE you change anything
+   ```
+2. **Only touch the files your task owns.** `main.py` is shared: Task 1 adds one model-import line and Task 3 adds the router lines. Nobody else edits it. `README.md` is only edited by Task 0.
+3. **One person, one task, one PR.**
+4. **You test what you build.** A PR is ready only when `python -m pytest -v` passes in full.
+5. **Merge order:** Tasks 0, 1 and 2 in any order → Task 3 last. Start writing straight away. You can only *run* code that imports a teammate's file once their PR is on `main`; then do `git pull origin main` (or `git rebase main`) on your branch.
+6. **Never commit `.env`**, and never paste keys or `DATABASE_URL` into an AI chat.
+7. **Use the PR checklist below** in every PR description.
+
+### PR checklist
+
+- [ ] Title starts with the ticket, e.g. `[Step 6][BE Task 1] Submission model + Challenge.rules`
+- [ ] I only changed the files my ticket owns
+- [ ] I added the tests from my ticket and `python -m pytest -v` passes in full (old tests too)
+- [ ] No `app/` folder and no `app.` imports
+- [ ] No new package (or it's agreed and added to `requirements.txt`)
+- [ ] Any new column on an existing table has its `ALTER TABLE` written in the PR description
+- [ ] Every "Definition of Done" box in my ticket is ticked
+- [ ] Reviewer: one teammate from my pair has approved
+
+---
+
+# STEP 6 (Pair B2) — Submission & Verification Pipeline
+
+**The feature:** a learner sends an answer to a challenge. The backend saves it as `pending`, checks it with plain Python rules and updates it to `passed` or `needs_revision` with specific feedback. On the **first** pass it calls B1's `award_xp`. The learner can read back one submission or their whole history.
+
+| Learner does | Backend answers |
+|---|---|
+| Sends a vague answer | 201, `status: "needs_revision"`, specific `feedback` list, `xp_awarded: 0` |
+| Sends a good answer (first pass) | 201, `status: "passed"`, `xp_awarded` = challenge's `xp_reward`, user's total XP goes up |
+| Sends a good answer again | 201, `status: "passed"`, `xp_awarded: 0` (no farming) |
+| Each try | `attempt_number` goes 1, 2, 3... per user per challenge |
+| Unknown challenge / not logged in / empty answer | 404 / 401 / 422 |
+| Reads someone else's submission | 404 |
+
+**Tasks:** Task 0 (Clerk login setup) · Task 1 (database models + seed) · Task 2 (verifier + contract) · Task 3 (endpoints).
+**Merge order:** Tasks 0, 1 and 2 in any order (none depends on another) → Task 3 last.
+**Who does what:** the **team leader** owns Task 0 and Task 3. Task 0 is small and unblocks Task 3's login. While Tasks 1 and 2 are being built, the leader starts writing Task 3 and reviews the Task 1 and Task 2 PRs.
+
+---
+
+## TASK 0 — Clerk Login Setup + Logged-in User
+
+**Owner:** Team leader **Branch:** `feature/step6-be-task0-clerk-user`
+**Depends on:** nothing. It's small (about half a day), so do it first.
+**Blocks:** Task 3 (needs `get_current_user`, and a working Clerk login for its manual test). Tasks 1 and 2 don't need it. **Merge first** and post "Step 6 login setup is on main" together with the two `ALTER TABLE` lines from the README.
+
+### Goal
+Prove that Clerk login works on the backend, then link each Clerk login to our own `User` row so routes get a real `User` with an integer `id`. Also write up every database change Step 6 needs, in one place, so the team runs them once.
+
+### Files you use but don't edit
+- `middleware/auth.py` → the existing `get_current_user_id`. You **add** a new function to this file; don't change the existing one.
+- `database.py` → `get_session`.
+- `models/user.py` → `UserRead` (used in a test).
+- `tests/test_auth.py` → shows how Clerk is faked in tests.
+
+### Files to create / change
+```
+models/user.py                    (change: add clerk_user_id)
+middleware/auth.py                (change: add get_current_user)
+README.md                         (change: one Authentication line + new "Database changes for Step 6" section)
+tests/test_current_user.py        (new)
+```
+
+### What to build
+
+**1. `models/user.py`**. On the `User` **table** class only (not `UserBase`, `UserCreate` or `UserRead`), add:
+```python
+# Links this row to the learner's Clerk login (e.g. "user_2abc"). Empty for old users.
+clerk_user_id: Optional[str] = Field(default=None, unique=True, index=True, max_length=255)
+```
+
+**2. `middleware/auth.py` → add `get_current_user`** below `get_current_user_id`, with these new imports: `from fastapi import Depends`, `from sqlalchemy.exc import IntegrityError`, `from sqlmodel import Session, select`, `from database import get_session`, `from models.user import User`.
+```python
+def get_current_user(
+    clerk_user_id: str = Depends(get_current_user_id),
+    session: Session = Depends(get_session),
+) -> User:
+    """FastAPI dependency: returns the local User row for the logged-in Clerk user,
+    creating it on their first request. Raises 401 (via get_current_user_id) if not logged in.
+    """
+```
+Steps inside, each with a comment:
+1. `select(User).where(User.clerk_user_id == clerk_user_id)`. If a user is found, return it.
+2. Not found means this is their first request. Create `User(name="Learner", email=f"{clerk_user_id}@users.setuai.dev", hashed_password="!clerk", clerk_user_id=clerk_user_id)`.
+   - Clerk session tokens carry no email, so the email is a placeholder. **Don't use a `.local` domain:** the email validator rejects it, and that would crash `GET /users/{id}`.
+   - `"!clerk"` is not a real hash, so nobody can ever log in with a password.
+3. `session.add`, then `session.commit()` and `session.refresh(user)`, then return it.
+4. **Race guard:** wrap the commit in `try/except IntegrityError`. If two first requests arrive at once, the second hits the unique constraint: call `session.rollback()`, run the same select again and return that user.
+
+**3. `README.md`**.
+- Under the "Authentication" section, add: "Routes that need the database `User` row (with its integer `id`) use `Depends(get_current_user)` from `middleware/auth.py`. It creates the user on their first request."
+- Add a new section "Database changes for Step 6" listing **all** of Step 6's changes (the `challenges` line is for Task 1's new column; both lines are safe to run at any time):
+  ```sql
+  -- run once on any existing local database (new databases get these automatically)
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_user_id VARCHAR(255) UNIQUE;
+  ALTER TABLE challenges ADD COLUMN IF NOT EXISTS rules JSON NOT NULL DEFAULT '{}';
+  ```
+  Below it, add: "The `submissions` table is created automatically when the server restarts."
+
+### Tests to write
+**`tests/test_current_user.py`** uses the `session` fixture and calls the dependency as a plain function: `get_current_user(clerk_user_id="user_new", session=session)`.
+1. Unknown id `"user_new"` → returns a `User` with an `int` id and `clerk_user_id == "user_new"`. `len(session.exec(select(User)).all()) == 1`.
+2. Called twice with `"user_new"` → both return the same `id`, still 1 user row.
+3. A user saved beforehand with `clerk_user_id="user_old"` and `name="Old"` → returned with that id and name `"Old"`, no new row.
+4. `"user_a"` then `"user_b"` → two different ids, 2 rows.
+5. The created user's email passes validation: `UserRead.model_validate(user)` does not raise.
+
+### Done when
+1. `python -m pytest -v`: `test_current_user.py` passes and all old tests still pass.
+2. On your local Postgres: run both `ALTER TABLE` lines. `uvicorn main:app --reload` starts with no error.
+3. **Clerk works end to end** (a person does this, not the agent):
+   1. Check that your `.env` has `CLERK_SECRET_KEY` (and `CLERK_AUTHORIZED_PARTIES` if your frontend isn't on `http://localhost:3000`). See `.env.example`.
+   2. Start the frontend, sign in, open the browser console and run `await window.Clerk.session.getToken()`.
+   3. Run `curl -H "Authorization: Bearer <token>" http://127.0.0.1:8000/users/me`. You should get `200` with your `clerk_user_id`. Without the header you should get `401`.
+   4. Write these steps in the team channel so the Task 3 manual test can reuse them.
+
+### Definition of Done
+- [ ] `get_current_user` returns a `User`, creates one on first login with a valid placeholder email, and survives the duplicate race
+- [ ] README has the Authentication line and the "Database changes for Step 6" section with both `ALTER TABLE` lines
+- [ ] Real Clerk token gives 200 on `/users/me`; steps shared with the team
+- [ ] Test file passes; whole suite green
+- [ ] Merged first and announced with the `ALTER TABLE` lines
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 1 — Submission Model, Challenge Rules + Seed Challenge
+
+**Owner:** ____________ **Branch:** `feature/step6-be-task1-models`
+**Depends on:** nothing. Start now.
+**Blocks:** Task 3 (needs `Submission`, `SubmissionStatus`, and the seed challenge for its manual test). **Merge early** and post "Step 6 models + seed are on main". Tell Pair B1 that `Challenge` now has `rules`.
+
+### Goal
+Give the database a `submissions` table that remembers every answer a learner sends, give each challenge a `rules` field for the answer checker, and write a script that puts a test challenge with rules in the database.
+
+### Files you use but don't edit
+- `models/completed_challenge.py` → the style to copy.
+- `models/user.py`, `models/module.py` → used in tests.
+- `models/sub_module.py` → `SubModule` (seed script and tests). `database.py` → `engine` (seed script).
+
+### Files to create / change
+```
+models/submission.py              (new)
+models/__init__.py                (change: export the Submission classes)
+models/challenge.py               (change: add rules)
+main.py                           (change: ONE import line)
+scripts/seed_challenge.py         (new)
+tests/test_submission_model.py    (new)
+tests/test_seed_challenge.py      (new)
+```
+
+### What to build
+
+**1. `models/challenge.py`**. Add `from sqlalchemy import Column, JSON`. On the `Challenge` **table** class add:
+```python
+# The answer checker's rules, e.g. {"min_words": 8, "required_keywords": ["mood"]}
+rules: dict = Field(default_factory=dict, sa_column=Column(JSON))
+```
+and on `ChallengeRead` add `rules: dict = {}`. Don't change `ChallengeBase` or `ChallengeCreate`. (This is Pair B1's model, so tell them.)
+
+**2. `models/submission.py`** (new), with this exact shape plus a short beginner comment on each field:
+```python
+from datetime import datetime, timezone
+from typing import Optional
+from sqlalchemy import Column, JSON
+from sqlmodel import Field, SQLModel
+
+
+class SubmissionStatus:
+    """The only three allowed status words. Use these instead of typing strings."""
+    PENDING = "pending"
+    PASSED = "passed"
+    NEEDS_REVISION = "needs_revision"
+
+
+class SubmissionBase(SQLModel):
+    user_id: int = Field(foreign_key="users.id", index=True, nullable=False)
+    challenge_id: int = Field(foreign_key="challenges.id", index=True, nullable=False)
+    answer_text: str
+    status: str = Field(default=SubmissionStatus.PENDING, nullable=False)
+    xp_awarded: int = Field(default=0, ge=0)
+    attempt_number: int = Field(default=1, ge=1)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class Submission(SubmissionBase, table=True):
+    __tablename__ = "submissions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    feedback: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+
+
+class SubmissionRead(SubmissionBase):
+    id: int
+    feedback: list[str] = []
+```
+Then in `models/__init__.py` add `from models.submission import Submission, SubmissionBase, SubmissionRead, SubmissionStatus`, and add the four names to `__all__`, following the existing pattern.
+
+**3. `main.py`**. Add exactly one line, after the other `from models...` imports:
+```python
+from models.submission import Submission  # noqa: F401 - registers table with SQLModel metadata
+```
+
+**4. `scripts/seed_challenge.py`**. Safe to re-run, never deletes anything.
+```python
+from sqlmodel import Session, select
+from database import engine
+from models.challenge import Challenge
+from models.sub_module import SubModule
+
+SEED_TITLE = "Describe a sunset"
+SEED_RULES = {"min_words": 8, "required_keywords": ["mood", "style"]}
+
+
+def seed_challenge(session: Session) -> Challenge | None:
+    ...
+```
+1. If a `Challenge` with `title == SEED_TITLE` exists, return it.
+2. Otherwise get the `SubModule` with the lowest id (`select(SubModule).order_by(SubModule.id)`). If there is none, `print("No sub-modules found. Run python -m scripts.seed first.")` and return `None`.
+3. Otherwise create `Challenge(title=SEED_TITLE, sub_module_id=<that id>, xp_reward=10, rules=SEED_RULES)`, then add, commit, refresh and return it.
+4. Under `if __name__ == "__main__":`, open `with Session(engine) as session:`, call `seed_challenge(session)` and, if a challenge came back, `print(f"Challenge id = {challenge.id}")`.
+
+### Tests to write
+**`tests/test_submission_model.py`** uses the `session` fixture. Write a helper `_make_user_and_challenge(session)` that creates one `User(name="A", email="a@example.com", hashed_password="pw")` and the Module → SubModule → Challenge chain from Project context, and returns `(user, challenge)`.
+1. `Submission(user_id=..., challenge_id=..., answer_text="hi")`, added and committed → `id` is set, status `"pending"`, feedback `[]`, xp_awarded `0`, attempt_number `1` and `created_at` is not None.
+2. Save it with `feedback=["a", "b"]`, call `session.expire_all()`, and load it again with `session.get(Submission, id)` → feedback is `["a", "b"]`.
+3. Save it, set `sub.feedback = ["x"]`, commit, call `session.expire_all()` and load it again → feedback is `["x"]`.
+4. `SubmissionStatus.PENDING == "pending"`, `PASSED == "passed"` and `NEEDS_REVISION == "needs_revision"`.
+5. A `Challenge` created without rules → after commit + refresh, `rules == {}`. One created with `rules={"min_words": 8, "required_keywords": ["mood"]}` → after `expire_all()` and reload, it is equal.
+6. Two submissions for the same user and challenge can both be saved (no unique constraint: every attempt is kept).
+
+**`tests/test_seed_challenge.py`** uses the `session` fixture.
+1. Empty DB → `seed_challenge(session)` returns `None`, and `session.exec(select(Challenge)).all() == []`.
+2. With one Module + SubModule (see Project context) → it returns a challenge with title `"Describe a sunset"`, `xp_reward == 10`, `rules == {"min_words": 8, "required_keywords": ["mood", "style"]}` and `sub_module_id` equal to that sub-module's id.
+3. Called twice → the same id both times, and only 1 challenge with that title exists.
+
+### Done when
+1. `python -m pytest -v`: `test_submission_model.py` and `test_seed_challenge.py` pass, and all old tests still pass.
+2. On your local Postgres: run `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS rules JSON NOT NULL DEFAULT '{}';`. `uvicorn main:app --reload` starts with no error, and the `submissions` table exists with all the columns above (psql `\d submissions`, or any DB viewer).
+3. `python -m scripts.seed`, then `python -m scripts.seed_challenge` twice. The same id is printed both times. Post that id in the team channel for Task 3's manual test.
+   **Warning:** `scripts.seed` empties the curriculum tables with `TRUNCATE ... CASCADE`, which also deletes every challenge, submission and completion that points at them. Run it once at the start, never after you've started testing submissions. Then just re-run `scripts.seed_challenge`.
+
+### Definition of Done
+- [ ] `Submission`, `SubmissionStatus`, `SubmissionRead` match the Shared interfaces exactly
+- [ ] `Challenge.rules` defaults to `{}`; Pair B1 told
+- [ ] The `ALTER TABLE challenges` line is in the PR description
+- [ ] Seed script is re-runnable and never deletes data
+- [ ] 2 test files pass; whole suite green
+- [ ] Merged early and announced
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 2 — Rule-based Verifier + API Contract
+
+**Owner:** ____________ **Branch:** `feature/step6-be-task2-verifier`
+**Depends on:** nothing. Start now. Your code imports nothing from teammates.
+**Blocks:** Task 3 imports `verify_answer`. **Post the contract text to the frontend team on day 1**; don't wait for the merge. When your PR merges, post "Step 6 verifier + contract are on main".
+
+### Goal
+Write the API contract the frontend builds against, and the plain Python checker that judges an answer and explains what to fix. The checker is the heart of Step 6, so its tests cover every rule and every edge case.
+
+### Files you use but don't edit
+- None. The verifier is pure Python. Read `models/challenge.py` only to see that a challenge's `rules` is a plain `dict` (Task 1 adds it).
+
+### Files to create
+```
+docs/contracts/step6_contract.md
+services/verifier.py
+tests/test_verifier.py
+```
+
+### What to build
+
+**1. `docs/contracts/step6_contract.md`**. Write it in Markdown with these sections, using these values exactly (Task 3 implements this word for word):
+- **Title:** "Step 6 Contract (v1)". Under it: "Changes only with a heads-up in #backend".
+- **`POST /submissions`** (needs `Authorization: Bearer <Clerk session token>`). Request body:
+  ```json
+  { "challenge_id": 1, "answer_text": "A calm beach at sunset, warm orange mood, watercolor style" }
+  ```
+  `challenge_id` is an integer. `answer_text` is 1–5000 characters.
+- **Response `201`.** The same shape for pass AND fail:
+  ```json
+  {
+    "submission_id": 12,
+    "challenge_id": 1,
+    "status": "needs_revision",
+    "feedback": ["Your answer should mention 'mood'."],
+    "xp_awarded": 0,
+    "attempt_number": 2,
+    "created_at": "2026-10-05T10:15:30.123456Z"
+  }
+  ```
+  A field table:
+  - `status`: one of `"pending" | "passed" | "needs_revision"`.
+  - `feedback`: a list of strings, never null. On a pass it is `["Great work! Your answer meets all the requirements."]`.
+  - `xp_awarded`: an integer, 0 unless this attempt earned XP. Only the first pass earns XP.
+  - `attempt_number`: 1, 2, 3... per user per challenge.
+  - `created_at`: an ISO 8601 UTC string ending in `Z`.
+- **`GET /submissions/{submission_id}`** → one submission, same shape. 404 if it doesn't exist or isn't yours.
+- **`GET /submissions?challenge_id=1`** → a list of **your** submissions, newest first. `challenge_id` is optional.
+- **Errors:**
+  - `401`: not logged in.
+  - `404`: `{"detail": "Challenge not found"}` or `{"detail": "Submission not found"}`.
+  - `422`: the body doesn't match (FastAPI's standard error shape).
+- **"Notes for frontend"** section: in `api/submissionApi.ts`, the real call should:
+  - POST to `` `${process.env.NEXT_PUBLIC_API_URL}/submissions` `` (not `/api/submissions`);
+  - send the body `{ challenge_id: Number(challengeId), answer_text: answer }`;
+  - add the Clerk token as `Authorization: Bearer <token>`;
+  - map the response field `xp_awarded` to `xpEarned`. `status` and `feedback` already match `types/submission.ts`.
+- **Message to post** in #backend and #frontend: "Step 6 contract v1 is in .github/backend/docs/contracts/step6_contract.md. Status values: pending / passed / needs_revision. Same response shape for pass and fail. Keep mocking until we say the endpoint is merged."
+
+**2. `services/verifier.py`**. A **pure** module: it must not import FastAPI, SQLModel, `database` or `models`. Exact shape:
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class VerificationResult:
+    passed: bool
+    feedback: list[str] = field(default_factory=list)
+
+
+def verify_answer(answer_text: str, rules: dict) -> VerificationResult:
+    ...
+```
+Logic, in this order, with a comment on each block:
+1. `text = (answer_text or "").strip()`. If `text` is empty, **return immediately** with `VerificationResult(False, ["Your answer is empty. Write your answer and try again."])`.
+2. `rules = rules or {}`, `lowered = text.lower()` and `word_count = len(text.split())`. Every keyword check is case-insensitive: compare `keyword.lower()` against `lowered`. It is a simple substring check: `keyword.lower() in lowered`.
+3. `min_words` (int): if it is set and `word_count < min_words`, add `f"Your answer is too short. Aim for at least {min_words} words (you wrote {word_count})."`
+4. `required_keywords` (list): for **each** keyword not found, add `f"Your answer should mention '{keyword}'."`
+5. `must_include_any_of` (list): if the list is non-empty and **none** are found, add `"Include at least one of these ideas: " + ", ".join(any_of) + "."`
+6. `forbidden_words` (list): for **each** word found, add `f"Please remove '{word}' and be more specific."`
+7. Return `VerificationResult(passed=len(feedback) == 0, feedback=feedback)`.
+
+Messages show each keyword exactly as written in the rules (keep its original case). Unknown rule keys are ignored.
+
+### Tests to write
+**`tests/test_verifier.py`**: plain function calls, no fixtures. Define at the top:
+```python
+RULES = {"min_words": 8, "required_keywords": ["mood", "style"]}
+GOOD = "calm beach at sunset with a warm mood in watercolor style"
+```
+1. `verify_answer("a beach", RULES)` → `passed is False`; one feedback line contains `"too short"` and `"(you wrote 2)"`.
+2. `verify_answer("a calm beach at sunset with warm orange light everywhere", RULES)` → fails, and `"Your answer should mention 'mood'."` is in the feedback.
+3. `verify_answer(GOOD, RULES)` → `passed is True`, `feedback == []`.
+4. `verify_answer(GOOD.upper(), RULES)` → passes (case-insensitive).
+5. For each of `""`, `"   "` and `None`: fails with `feedback == ["Your answer is empty. Write your answer and try again."]`.
+6. `verify_answer("a nice Thing here", {"forbidden_words": ["thing"]})` → fails with `["Please remove 'thing' and be more specific."]`.
+7. `{"must_include_any_of": ["sunset", "sunrise", "dusk"]}`: `"golden dusk sky"` passes; `"blue sky"` fails with `["Include at least one of these ideas: sunset, sunrise, dusk."]`.
+8. `verify_answer("anything at all", {})` and `verify_answer("anything at all", None)` → both pass.
+9. `verify_answer("one two three four five six seven eight", {"min_words": 8})` → passes (exactly 8 words is enough).
+10. `verify_answer("a beach", RULES).feedback` has exactly 3 lines in this order: the too-short line, the `'mood'` line, the `'style'` line.
+11. `verify_answer("I like Mood", {"required_keywords": ["MOOD"]})` → passes (both sides are lower-cased).
+
+### Done when
+1. `python -m pytest -v`: `test_verifier.py` passes and the whole suite is green.
+2. Manual check: in `python`, run `from services.verifier import verify_answer` and then `verify_answer("a beach", {"min_words": 8, "required_keywords": ["style", "mood"]})`. It shows `passed=False` and 3 specific messages.
+3. A frontend teammate has replied to the contract post.
+
+### Definition of Done
+- [ ] Contract file has every field and error listed above, and was posted to frontend
+- [ ] `verifier.py` imports no FastAPI/DB code; messages match this ticket word for word
+- [ ] An empty or None answer and empty or None rules never crash
+- [ ] Test file passes; whole suite green
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 3 — Submission Endpoints (POST + GET)
+
+**Owner:** Team leader **Branch:** `feature/step6-be-task3-endpoints`
+**Depends on:** Task 0, Task 1 and Task 2 on `main` to **run**. **Start immediately anyway:** write the route and tests against the Shared interfaces now. Don't create Task 0's, Task 1's or Task 2's files yourself. Once they're merged, `git pull origin main` on your branch, run the tests and fix what fails.
+**Blocks:** nothing; you complete the feature. When merged, post "Step 6 endpoint is on main" in #frontend.
+
+### Goal
+Connect everything: an endpoint that receives an answer, saves it, verifies it, awards XP on the first pass and returns the contract JSON, plus two read endpoints that only show a learner their own submissions.
+
+### Files you use but don't edit
+- `middleware/auth.py` → `get_current_user` (Task 0): a FastAPI dependency returning the logged-in `User` (with an int `.id`), or 401.
+- `models/submission.py` → `Submission`, `SubmissionStatus` (Task 1). See Shared interfaces for the fields.
+- `models/challenge.py` → `Challenge` with `.rules: dict` and `.xp_reward: int` (Task 1 / B1).
+- `services/verifier.py` → `verify_answer(answer_text, rules) -> VerificationResult` with `.passed: bool` and `.feedback: list[str]` (Task 2). For an empty answer it fails with `["Your answer is empty. Write your answer and try again."]`.
+- `services/progression.py` → `award_xp(user_id, challenge_id) -> dict` (use `["xp_awarded"]`) and `_execute_award_xp(session, user_id, challenge_id)` for tests (Pair B1).
+- `docs/contracts/step6_contract.md` → the response shape (Task 2).
+
+### Files to create / change
+```
+routes/submissions.py          (new)
+routes/__init__.py             (change: export submissions_router)
+main.py                        (change: import + include submissions_router)
+tests/test_submissions.py      (new)
+```
+
+### What to build
+
+**1. `routes/submissions.py`**. Imports and schemas, exactly:
+```python
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlmodel import Session, func, select
+
+from database import get_session
+from middleware.auth import get_current_user
+from models.challenge import Challenge
+from models.submission import Submission, SubmissionStatus
+from models.user import User
+from services.progression import award_xp  # imported at module level so tests can replace it
+from services.verifier import verify_answer
+
+router = APIRouter(prefix="/submissions", tags=["Submissions"])
+
+PASS_MESSAGE = "Great work! Your answer meets all the requirements."
+
+
+class SubmissionCreate(BaseModel):
+    challenge_id: int
+    answer_text: str = Field(min_length=1, max_length=5000)
+
+
+class SubmissionOut(BaseModel):
+    submission_id: int
+    challenge_id: int
+    status: str
+    feedback: list[str]
+    xp_awarded: int
+    attempt_number: int
+    created_at: datetime
+
+
+def to_out(sub: Submission) -> SubmissionOut:
+    ...
+```
+`to_out` copies the fields across, mapping `sub.id` → `submission_id` and `sub.feedback or []` → `feedback`. If `sub.created_at.tzinfo is None` (the DB drops the timezone), use `sub.created_at.replace(tzinfo=timezone.utc)` so the JSON ends in `Z`.
+
+**2. `POST ""`**: `@router.post("", response_model=SubmissionOut, status_code=status.HTTP_201_CREATED)`, with parameters `body: SubmissionCreate`, `session: Session = Depends(get_session)` and `current_user: User = Depends(get_current_user)`. Put a numbered comment on every step:
+1. Who is calling? `current_user`. FastAPI already returned 401 if they aren't logged in.
+2. `challenge = session.get(Challenge, body.challenge_id)`. If it's `None` → `raise HTTPException(status_code=404, detail="Challenge not found")`.
+3. Count this user's earlier tries for this challenge:
+   - `mine = (Submission.user_id == current_user.id, Submission.challenge_id == challenge.id)`
+   - `previous = session.exec(select(func.count()).select_from(Submission).where(*mine)).one()`
+   - `already_passed = session.exec(select(Submission).where(*mine, Submission.status == SubmissionStatus.PASSED)).first() is not None`
+4. Save first, as pending (the audit trail): `sub = Submission(user_id=current_user.id, challenge_id=challenge.id, answer_text=body.answer_text.strip(), status=SubmissionStatus.PENDING, attempt_number=previous + 1)`, then `session.add(sub)`, `session.commit()` and `session.refresh(sub)`.
+5. Judge it: `result = verify_answer(sub.answer_text, challenge.rules)`.
+6. Failed → `sub.status = SubmissionStatus.NEEDS_REVISION` and `sub.feedback = list(result.feedback)` (a new list). XP stays 0.
+7. Passed → `sub.status = SubmissionStatus.PASSED` and `sub.feedback = [PASS_MESSAGE]`. **Only if `not already_passed`:** `xp = award_xp(current_user.id, challenge.id)` and `sub.xp_awarded = xp["xp_awarded"]`. (B1 also returns 0 for a repeat, so both sides guard against farming.)
+8. Save again with `session.add(sub)`, `session.commit()` and `session.refresh(sub)`, then return `to_out(sub)`.
+
+**3. `GET "/{submission_id}"`**: `@router.get("/{submission_id}", response_model=SubmissionOut)`. `sub = session.get(Submission, submission_id)`. If `sub is None or sub.user_id != current_user.id` → 404 `"Submission not found"`. Never return 403: it would confirm the id exists. Otherwise return `to_out(sub)`.
+
+**4. `GET ""`**: `@router.get("", response_model=list[SubmissionOut])`, with the optional query `challenge_id: Optional[int] = None`. Build `select(Submission).where(Submission.user_id == current_user.id)`, filtering in the **database query** and not in Python afterwards. If `challenge_id` is given, add `.where(Submission.challenge_id == challenge_id)`. Order with `.order_by(Submission.created_at.desc(), Submission.id.desc())` and return `[to_out(s) for s in rows]`.
+
+**5. Register the router:**
+- In `routes/__init__.py`, add `from routes.submissions import router as submissions_router` and add `"submissions_router"` to `__all__`.
+- In `main.py`, add `submissions_router,` to the `from routes import (...)` list and `app.include_router(submissions_router)` after the other `include_router` lines.
+
+### Tests to write
+**`tests/test_submissions.py`** uses the `client` and `session` fixtures. Put this at the top:
+```python
+import pytest
+from sqlmodel import Session, select
+
+from main import app
+from middleware.auth import get_current_user
+from models.challenge import Challenge
+from models.module import Module
+from models.sub_module import SubModule
+from models.submission import Submission
+from models.user import User
+from services.progression import _execute_award_xp
+
+BAD = "a beach"
+GOOD = "calm beach at sunset with a warm mood in watercolor style"
+RULES = {"min_words": 8, "required_keywords": ["mood", "style"]}
+
+
+@pytest.fixture(autouse=True)
+def xp_uses_test_db(monkeypatch, session):
+    # The real award_xp opens its own connection to Postgres; point it at the test DB instead.
+    monkeypatch.setattr(
+        "routes.submissions.award_xp",
+        lambda user_id, challenge_id: _execute_award_xp(session, user_id, challenge_id),
+    )
+
+
+def _seed(session: Session):
+    """Two users and one challenge (xp_reward=10, RULES). Returns (user_a, user_b, challenge)."""
+    ...
+
+
+def _login_as(user: User):
+    app.dependency_overrides[get_current_user] = lambda: user
+
+
+def _submit(client, challenge_id, text):
+    return client.post("/submissions", json={"challenge_id": challenge_id, "answer_text": text})
+```
+`_seed` creates `User(name="A", email="a@example.com", hashed_password="pw")`, `User(name="B", email="b@example.com", hashed_password="pw")`, the Module → SubModule chain, and `Challenge(sub_module_id=..., title="Sunset", xp_reward=10, rules=RULES)`.
+
+Tests (each one calls `_seed` and `_login_as(user_a)` unless it says otherwise):
+1. **Fail:** `_submit(BAD)` → 201. `status == "needs_revision"`, `xp_awarded == 0`, `attempt_number == 1`. `feedback` has a line containing `"too short"`, plus `"Your answer should mention 'mood'."` and `"Your answer should mention 'style'."`.
+2. **Full journey:** BAD, GOOD, GOOD in order.
+   - 2nd response: `status == "passed"`, `xp_awarded == 10`, `attempt_number == 2`, `feedback == ["Great work! Your answer meets all the requirements."]`.
+   - 3rd response: `status == "passed"`, `xp_awarded == 0`, `attempt_number == 3`.
+   - Then `session.refresh(user_a)` → `user_a.total_xp == 10`.
+3. **Response shape:** `set(resp.json().keys()) == {"submission_id", "challenge_id", "status", "feedback", "xp_awarded", "attempt_number", "created_at"}`, `feedback` is a list, and `created_at` ends with `"Z"`.
+4. **Unknown challenge:** `_submit(9999, GOOD)` → 404 with `{"detail": "Challenge not found"}`, and `session.exec(select(Submission)).all() == []`.
+5. **Bad input:** `answer_text=""` → 422; `"x" * 5001` → 422; a body missing `challenge_id` → 422.
+6. **Blank answer:** `"   "` → 201, `"needs_revision"`, `feedback == ["Your answer is empty. Write your answer and try again."]`.
+7. **Not logged in:** no `_login_as`. Call `monkeypatch.setenv("CLERK_SECRET_KEY", "sk_test_fake")`, then POST `/submissions`, GET `/submissions` and GET `/submissions/1` → all three return 401.
+8. **Ownership:** as A, submit and note the `submission_id`. `_login_as(user_b)` → `GET /submissions/{id}` is 404 `{"detail": "Submission not found"}` and `GET /submissions` is `[]`. `_login_as(user_a)` → the same id returns 200 with the same `submission_id` and `status`.
+9. **History:** as A, submit BAD, BAD, GOOD → `GET /submissions` returns 3 items with `attempt_number`s `[3, 2, 1]` (newest first). `GET /submissions?challenge_id=<id>` returns 3, and `?challenge_id=9999` returns `[]`.
+10. **Attempts are per user:** A submits twice, then `_login_as(user_b)` and B submits once → B's `attempt_number == 1`.
+11. **No XP on fail:** as A, submit BAD → `session.refresh(user_a)` gives `total_xp == 0`.
+
+### Done when
+1. `python -m pytest -v`: `test_submissions.py` passes (11 tests) and the whole suite is green.
+2. Manual run on local Postgres (after the README's `ALTER TABLE`s and Task 1's seed): `uvicorn main:app --reload`, then open http://127.0.0.1:8000/docs. There is a **Submissions** section with 3 endpoints.
+3. Get a real token (the steps from Task 0: sign in on the frontend, then in the browser console run `await window.Clerk.session.getToken()`) and run, in order:
+   1. BAD → `needs_revision`.
+   2. GOOD → `passed` with `xp_awarded` 10 and `attempt_number` 2.
+   3. GOOD again → `xp_awarded` 0 and `attempt_number` 3.
+   4. `challenge_id` 9999 → 404.
+
+   For example: `curl -X POST http://127.0.0.1:8000/submissions -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d "{\"challenge_id\": <id>, \"answer_text\": \"a beach\"}"`. Then check that the `submissions` table has 3 rows and that `users.total_xp` went up by 10 exactly once.
+
+### Definition of Done
+- [ ] Every response matches `docs/contracts/step6_contract.md` field for field; `created_at` ends in `Z`
+- [ ] XP only on the first pass; repeat passes give 0; `attempt_number` counts per user per challenge
+- [ ] 404 for an unknown challenge and for someone else's submission; 401 logged out; 422 bad input
+- [ ] The row is saved as `pending` before verifying; feedback is assigned as a new list
+- [ ] I didn't create or edit Task 0's, Task 1's or Task 2's files
+- [ ] Test file passes; whole suite green
+
+---
+
+## FINAL — Step 6 Backend Team Check (Tasks 0–3 together)
+
+Done **together** once all four are merged, led by the team leader. It is not one person's job.
+1. Everyone runs `git checkout main`, `git pull origin main` and `pip install -r requirements.txt`, runs the two `ALTER TABLE` lines from the README on their local Postgres, then `python -m pytest -v`. Everything should be green.
+2. `python -m scripts.seed` (this wipes challenges and submissions; see Task 1's warning), `python -m scripts.seed_challenge`, then `uvicorn main:app --reload`.
+3. Together, with a real Clerk token, tick the team plan's checklist:
+   - [ ] Incorrect answer → `needs_revision`, `xp_awarded` 0, specific feedback sentences
+   - [ ] Correct answer → `passed` with `xp_awarded` > 0 on the first pass; `users.total_xp` went up
+   - [ ] Passing again → 0 extra XP; `attempt_number` +1 each time
+   - [ ] Unknown challenge 404 · logged out 401 · empty answer 422
+   - [ ] Another user can't read your submission (404)
+   - [ ] Every response matches the contract field for field
+4. Anything broken → the file's owner fixes it on a new branch **with a test that would have caught it**.
+5. Post the handoff:
+   - **#frontend:** "Step 6 endpoint is on main. Contract unchanged. Set `USE_MOCK = false`, POST to `/submissions` with the Clerk token, send `{challenge_id, answer_text}` and map `xp_awarded` → `xpEarned`."
+   - **Pair B1:** "We call your real `award_xp` on the first pass only. `Challenge.rules` was added to your model. `get_current_user` in `middleware/auth.py` is ready for your Step 5.4 route."
+
+**Known limits (for Step 9):**
+- `award_xp` commits in its own session, so if the final save fails after XP was given, the row stays `pending`.
+- Auto-created users get a placeholder email (`<clerk id>@users.setuai.dev`) and the name "Learner" until Clerk profile data is synced.
+- Keyword checks are substring matches, so "style" also matches "lifestyle".

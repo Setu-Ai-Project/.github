@@ -1,7 +1,12 @@
 import os
 
 from clerk_backend_api import AuthenticateRequestOptions, authenticate_request
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, select
+
+from database import get_session
+from models.user import User
 
 
 def get_current_user_id(request: Request) -> str:
@@ -29,3 +34,41 @@ def get_current_user_id(request: Request) -> str:
         )
 
     return state.payload["sub"]
+
+
+def get_current_user(
+    clerk_user_id: str = Depends(get_current_user_id),
+    session: Session = Depends(get_session),
+) -> User:
+    """FastAPI dependency: returns the local User row for the logged-in Clerk user,
+    creating it on their first request. Raises 401 (via get_current_user_id) if not logged in.
+    """
+    statement = select(User).where(User.clerk_user_id == clerk_user_id)
+
+    # 1. Already linked: return the existing row.
+    user = session.exec(statement).first()
+    if user:
+        return user
+
+    # 2. First request from this Clerk user: create their local row.
+    # Clerk session tokens carry no email, so use a placeholder on a real-looking
+    # domain (".local" is rejected by the email validator). "!clerk" is not a valid
+    # password hash, so nobody can log in to this row with a password.
+    user = User(
+        name="Learner",
+        email=f"{clerk_user_id}@users.setuai.dev",
+        hashed_password="!clerk",
+        clerk_user_id=clerk_user_id,
+    )
+    session.add(user)
+
+    # 3. Save it. If two first requests raced, the unique constraint rejects the
+    # second insert, so roll back and return the row the other request created.
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        return session.exec(statement).one()
+
+    session.refresh(user)
+    return user
