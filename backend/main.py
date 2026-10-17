@@ -5,6 +5,7 @@ from sqlmodel import SQLModel
 
 from database import engine
 from realtime.manager import manager
+from realtime.ws_routes import router as ws_router
 from models.user import User  # noqa: F401 - registers table with SQLModel metadata
 from models.module import Module  # noqa: F401 - registers table with SQLModel metadata
 from models.sub_module import SubModule  # noqa: F401 - registers table with SQLModel metadata
@@ -45,6 +46,7 @@ app.include_router(progress_router)
 app.include_router(bug_trigger_router)
 app.include_router(spark_term_router)
 app.include_router(byte_fact_router)
+app.include_router(ws_router)
 
 
 @app.get("/")
