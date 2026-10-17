@@ -22,6 +22,7 @@ from routes import (
     user_router,
     module_router,
     sub_module_router,
+    progression_router,
     progress_router,
     bug_trigger_router,
     spark_term_router,
@@ -42,6 +43,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(user_router)
 app.include_router(module_router)
 app.include_router(sub_module_router)
+app.include_router(progression_router)
 app.include_router(progress_router)
 app.include_router(bug_trigger_router)
 app.include_router(spark_term_router)
