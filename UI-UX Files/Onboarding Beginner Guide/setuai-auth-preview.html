@@ -108,7 +108,7 @@
   <main>
     <h1 id="heading">Create your account</h1>
     <p class="sub" id="subheading">Join the adventure — it takes less than a minute.</p>
-    <form onsubmit="return false;">
+    <form id="authForm" onsubmit="handleAuthSubmit(event); return false;">
       <label>Email
         <input type="email" placeholder="you@example.com" autocomplete="email" />
       </label>
@@ -117,9 +117,12 @@
       </label>
       <button class="btn-primary" type="submit">Continue</button>
       <div class="divider">or</div>
-      <button class="btn-google" type="button"><span class="g-dot">G</span>Continue with Google</button>
+      <button class="btn-google" type="button" onclick="handleAuthSubmit(event)"><span class="g-dot">G</span>Continue with Google</button>
     </form>
     <p class="switch"><span id="switchText">Already playing? </span><button id="switchBtn" onclick="toggleMode()">Log in</button></p>
+    <div style="margin-top: 16px; text-align: center; font-size: 14px;">
+      <a href="setuai-dashboard.html" style="color: var(--teal); font-weight: 700; text-decoration: underline;">Direct Jump: Open Dashboard Preview &rarr;</a>
+    </div>
   </main>
 
   <footer>Master AI through games, quizzes, and more</footer>
@@ -135,6 +138,16 @@
     document.getElementById('switchText').textContent = signup ? 'Already playing? ' : 'New here? ';
     document.getElementById('switchBtn').textContent = signup ? 'Log in' : 'Sign up';
     document.getElementById('pw').autocomplete = signup ? 'new-password' : 'current-password';
+  }
+
+  function handleAuthSubmit(event) {
+    if (event) event.preventDefault();
+    if (signup) {
+      window.location.href = "setuai-onboarding.html";
+    } else {
+      window.location.href = "setuai-dashboard.html";
+    }
+    return false;
   }
 </script>
 </body>
