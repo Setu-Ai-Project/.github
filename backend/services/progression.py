@@ -3,6 +3,7 @@
 This module implements the award_xp contract agreed in docs/contracts/award_xp.md.
 """
 
+import logging
 from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
@@ -11,8 +12,12 @@ from config.progression_rules import level_for_xp, xp_to_next_level
 from database import engine
 from models.challenge import Challenge
 from models.completed_challenge import CompletedChallenge
+from models.sub_module import SubModule
 from models.user import User
 from services.badges import check_and_award_badges
+from services.certificates import is_module_completed, issue_certificate
+
+logger = logging.getLogger(__name__)
 
 
 class UserNotFound(Exception):
@@ -111,6 +116,22 @@ def _execute_award_xp(session: Session, user_id: int, challenge_id: int) -> dict
         raise exc
 
     session.refresh(user)
+
+    # 5. Check if the module this challenge belongs to is now complete, and issue certificate if so
+    module_id = None
+    try:
+        sub_module = session.get(SubModule, challenge.sub_module_id)
+        if sub_module:
+            module_id = sub_module.module_id
+            if is_module_completed(session, user_id, module_id):
+                issue_certificate(session, user, module_id)
+    except Exception:
+        logger.exception(
+            "Certificate issuance failed for user %s on module %s",
+            user_id,
+            module_id,
+        )
+        session.rollback()
 
     return {
         "user_id": user_id,
