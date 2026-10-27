@@ -1,8 +1,11 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlmodel import SQLModel
 
 from database import engine
+from realtime.manager import manager
+from realtime.ws_routes import router as ws_router
 from models.user import User  # noqa: F401 - registers table with SQLModel metadata
 from models.module import Module  # noqa: F401 - registers table with SQLModel metadata
 from models.sub_module import SubModule  # noqa: F401 - registers table with SQLModel metadata
@@ -19,10 +22,12 @@ from routes import (
     user_router,
     module_router,
     sub_module_router,
+    progression_router,
     progress_router,
     bug_trigger_router,
     spark_term_router,
     byte_fact_router,
+    challenge_router,
 )
 
 
@@ -30,6 +35,7 @@ from routes import (
 async def lifespan(app: FastAPI):
     # Automatically create tables if they do not exist
     SQLModel.metadata.create_all(engine)
+    manager.loop = asyncio.get_running_loop()
     yield
 
 
@@ -38,10 +44,13 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(user_router)
 app.include_router(module_router)
 app.include_router(sub_module_router)
+app.include_router(progression_router)
 app.include_router(progress_router)
 app.include_router(bug_trigger_router)
 app.include_router(spark_term_router)
 app.include_router(byte_fact_router)
+app.include_router(challenge_router)
+app.include_router(ws_router)
 
 
 @app.get("/")

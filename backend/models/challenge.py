@@ -20,3 +20,25 @@ class ChallengeCreate(ChallengeBase):
 
 class ChallengeRead(ChallengeBase):
     id: int
+
+
+class ChallengeCompletionRequest(SQLModel):
+    challenge_id: int
+
+
+class UnlockedBadge(SQLModel):
+    slug: str
+    name: str
+
+
+class ChallengeCompletionResponse(SQLModel):
+    user_id: int
+    challenge_id: int
+    xp_awarded: int
+    total_xp: int
+    level: int
+    previous_level: int
+    leveled_up: bool
+    xp_to_next_level: int
+    badges_unlocked: list[UnlockedBadge] = []
+    already_completed: bool
