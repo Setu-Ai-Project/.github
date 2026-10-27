@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSignIn, useSignUp } from "@clerk/nextjs";
 import { useState } from "react";
 
 type Mode = "signup" | "login";
@@ -10,148 +10,81 @@ type Mode = "signup" | "login";
 export default function Home() {
   const router = useRouter();
 
-  const {
-    signIn,
-    errors: signInErrors,
-    fetchStatus: signInFetchStatus,
-  } = useSignIn();
-
-  const {
-    signUp,
-    errors: signUpErrors,
-    fetchStatus: signUpFetchStatus,
-  } = useSignUp();
-
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const isSignup = mode === "signup";
 
-  const loading =
-    signInFetchStatus === "fetching" ||
-    signUpFetchStatus === "fetching";
-
-  async function handleSubmit(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault();
-
-    setError("");
-
-    if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
-      return;
-    }
-
-    if (isSignup && password.length < 15) {
-      setError("Password must be at least 15 characters.");
-      return;
-    }
-
-    try {
-      if (isSignup) {
-        const { error: signupError } =
-          await signUp.password({
-            emailAddress: email.trim(),
-            password,
-          });
-
-        if (signupError) {
-          setError(
-            signupError.message ||
-              "We couldn't create your account. Please try again."
-          );
-          return;
-        }
-
-        /*
-         * Email verification will be added later.
-         *
-         * If Clerk allows the signup to complete immediately,
-         * finalize the session and continue to onboarding.
-         */
-        if (signUp.status === "complete") {
-          const { error: finalizeError } =
-            await signUp.finalize();
-
-          if (finalizeError) {
-            setError(
-              finalizeError.message ||
-                "Your account was created, but we couldn't finish signing you in."
-            );
-            return;
-          }
-
-          router.push("/onboarding");
-          return;
-        }
-
-        setError(
-          "Your account was created, but email verification is required. We'll add that next."
-        );
-      } else {
-        const { error: signinError } =
-          await signIn.password({
-            emailAddress: email.trim(),
-            password,
-          });
-
-        if (signinError) {
-          setError(
-            signinError.message ||
-              "Incorrect email or password."
-          );
-          return;
-        }
-
-        if (signIn.status === "complete") {
-          const { error: finalizeError } =
-            await signIn.finalize();
-
-          if (finalizeError) {
-            setError(
-              finalizeError.message ||
-                "We couldn't finish signing you in."
-            );
-            return;
-          }
-
-          router.push("/onboarding");
-          return;
-        }
-
-        setError(
-          "Additional verification is required before you can sign in."
-        );
-      }
-    } catch (err) {
-      console.error("Authentication error:", err);
-
-      // Sign-up and sign-in name the email field differently:
-      // sign-up uses "emailAddress", sign-in uses "identifier".
-      const emailError = isSignup
-        ? signUpErrors?.fields?.emailAddress?.message
-        : signInErrors?.fields?.identifier?.message;
-
-      const passwordError = isSignup
-        ? signUpErrors?.fields?.password?.message
-        : signInErrors?.fields?.password?.message;
-
-      const fieldError = emailError || passwordError;
-
-      setError(
-        fieldError ||
-          "Something went wrong. Please check your details and try again."
-      );
-    }
-  }
-
-  function switchMode() {
+  function toggleMode() {
     setMode(isSignup ? "login" : "signup");
     setError("");
     setPassword("");
+  }
+
+  function handleContinue(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setError("");
+
+    if (!email.trim()) {
+      setError("Please enter your email address to continue.");
+      return;
+    }
+
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password should be at least 6 characters.");
+      return;
+    }
+
+    setLoading(true);
+
+    // Save demo user profile locally so the dashboard can greet them
+    try {
+      if (typeof window !== "undefined") {
+        const username = email.split("@")[0] || "Learner";
+        localStorage.setItem("setuai_user_email", email.trim());
+        localStorage.setItem("setuai_user_name", username);
+      }
+    } catch {
+      // Ignore storage errors in private mode
+    }
+
+    setTimeout(() => {
+      setLoading(false);
+      if (isSignup) {
+        router.push("/onboarding");
+      } else {
+        router.push("/dashboard");
+      }
+    }, 300);
+  }
+
+  function handleGoogleLogin() {
+    setLoading(true);
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("setuai_user_email", "learner@google.com");
+        localStorage.setItem("setuai_user_name", "Google Explorer");
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    setTimeout(() => {
+      setLoading(false);
+      if (isSignup) {
+        router.push("/onboarding");
+      } else {
+        router.push("/dashboard");
+      }
+    }, 250);
   }
 
   return (
@@ -161,13 +94,12 @@ export default function Home() {
         aria-hidden
         className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-tealpop/40 blur-2xl"
       />
-
       <div
         aria-hidden
         className="pointer-events-none absolute -right-24 bottom-10 h-80 w-80 rounded-full bg-coral/25 blur-2xl"
       />
 
-      {/* Logo / wordmark */}
+      {/* Header logo & wordmark */}
       <header className="relative z-10 flex flex-col items-center gap-3 text-center">
         <div className="flex items-center gap-3">
           <Image
@@ -178,23 +110,19 @@ export default function Home() {
             priority
             className="h-12 w-12 rounded-2xl border-4 border-ink shadow-[4px_4px_0_#172A32]"
           />
-
           <span className="font-display text-[28px] font-black tracking-tight">
             SetuAI
           </span>
         </div>
-
         <p className="font-display-italic text-[24px] italic opacity-80">
           The Next Step in AI Literacy
         </p>
       </header>
 
-      {/* Auth card */}
+      {/* Auth Card matching UI/UX design specification */}
       <main className="relative z-10 mt-8 w-full max-w-md rounded-3xl border-4 border-ink bg-white p-6 shadow-[8px_8px_0_#172A32] sm:p-8">
         <h1 className="font-display text-[28px] font-black leading-tight">
-          {isSignup
-            ? "Create your account"
-            : "Welcome back"}
+          {isSignup ? "Create your account" : "Welcome back"}
         </h1>
 
         <p className="mt-1 text-[16px] text-taskgray">
@@ -203,7 +131,6 @@ export default function Home() {
             : "Pick up right where your last quest left off."}
         </p>
 
-        {/* Error */}
         {error && (
           <div
             role="alert"
@@ -213,20 +140,14 @@ export default function Home() {
           </div>
         )}
 
-        <form
-          className="mt-6 flex flex-col gap-4"
-          onSubmit={handleSubmit}
-        >
+        <form className="mt-6 flex flex-col gap-4" onSubmit={handleContinue}>
           {/* Email */}
           <label className="flex flex-col gap-1.5 text-[16px] font-bold">
             Email
-
             <input
               type="email"
               value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
-              }
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
               required
@@ -238,65 +159,40 @@ export default function Home() {
           {/* Password */}
           <label className="flex flex-col gap-1.5 text-[16px] font-bold">
             Password
-
             <input
               type="password"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
-              placeholder="••••••••••••••••"
-              autoComplete={
-                isSignup
-                  ? "new-password"
-                  : "current-password"
-              }
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete={isSignup ? "new-password" : "current-password"}
               required
-              minLength={15}
               disabled={loading}
               className="rounded-xl border-2 border-ink/20 bg-cream px-4 py-3 font-normal outline-none placeholder:text-taskgray/70 focus:border-tealpop disabled:opacity-60"
             />
           </label>
 
-          {/* Clerk CAPTCHA */}
-          {isSignup && (
-            <div
-              id="clerk-captcha"
-              className="flex justify-center"
-            />
-          )}
-
-          {/* Continue */}
+          {/* Continue button */}
           <button
             type="submit"
             disabled={loading}
-            className="mt-1 w-full rounded-2xl border-4 border-ink bg-ink px-5 py-3 text-[16px] font-black text-cream transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-1 flex w-full items-center justify-center rounded-2xl border-4 border-ink bg-ink px-5 py-3 text-[16px] font-black text-cream shadow-[4px_4px_0_#172A32] transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading
-              ? "Please wait..."
-              : "Continue"}
+            {loading ? "Checking..." : "Continue"}
           </button>
 
           {/* Divider */}
           <div className="flex items-center gap-3 text-[16px] font-bold text-taskgray">
-            <span
-              aria-hidden
-              className="h-0.5 flex-1 rounded bg-ink/10"
-            />
-
+            <span aria-hidden className="h-0.5 flex-1 rounded bg-ink/10" />
             or
-
-            <span
-              aria-hidden
-              className="h-0.5 flex-1 rounded bg-ink/10"
-            />
+            <span aria-hidden className="h-0.5 flex-1 rounded bg-ink/10" />
           </div>
 
-          {/* Google - temporarily disabled */}
+          {/* Continue with Google */}
           <button
             type="button"
-            disabled
-            className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-2xl border-[3px] border-ink bg-white px-5 py-3 text-[16px] font-black opacity-50"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border-[3px] border-ink bg-white px-5 py-3 text-[16px] font-black shadow-[4px_4px_0_#172A32] transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span
               aria-hidden
@@ -304,26 +200,32 @@ export default function Home() {
             >
               G
             </span>
-
             Continue with Google
           </button>
         </form>
 
-        {/* Switch mode */}
+        {/* Toggle Mode */}
         <p className="mt-6 text-center text-[16px]">
-          {isSignup
-            ? "Already playing? "
-            : "New here? "}
-
+          {isSignup ? "Already playing? " : "New here? "}
           <button
             type="button"
-            onClick={switchMode}
+            onClick={toggleMode}
             disabled={loading}
             className="font-black text-coral underline underline-offset-4 hover:opacity-80 disabled:opacity-50"
           >
             {isSignup ? "Log in" : "Sign up"}
           </button>
         </p>
+
+        {/* Direct Dashboard Bypass Link */}
+        <div className="mt-5 border-t-2 border-ink/10 pt-4 text-center">
+          <Link
+            href="/dashboard"
+            className="font-display text-sm font-bold text-tealpop underline underline-offset-4 hover:opacity-80"
+          >
+            Direct Jump: Open Dashboard &rarr;
+          </Link>
+        </div>
       </main>
 
       {/* Footer */}

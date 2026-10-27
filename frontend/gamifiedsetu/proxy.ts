@@ -9,6 +9,8 @@ const isPublicPage = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/onboarding(.*)",
+  "/dashboard(.*)",
   "/dev(.*)", // developer test pages
   "/__clerk(.*)", // Clerk's own proxy path
 ]);
