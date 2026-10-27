@@ -27,6 +27,7 @@ from routes import (
     bug_trigger_router,
     spark_term_router,
     byte_fact_router,
+    challenge_router,
 )
 
 
@@ -48,6 +49,7 @@ app.include_router(progress_router)
 app.include_router(bug_trigger_router)
 app.include_router(spark_term_router)
 app.include_router(byte_fact_router)
+app.include_router(challenge_router)
 app.include_router(ws_router)
 
 
