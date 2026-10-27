@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Byte back view">
+  <title>Byte - back</title>
+  <!-- Same colors/outline as base, rear: no face screen, no chest panel/bolt. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="100" y1="38" x2="100" y2="24" stroke="#303030" stroke-width="5"/>
+    <circle cx="100" cy="20" r="6" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="64" y="62" width="12" height="16" rx="6" fill="#DC6F51" stroke="#303030" stroke-width="4.5"/>
+    <rect x="124" y="62" width="12" height="16" rx="6" fill="#DC6F51" stroke="#303030" stroke-width="4.5"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="84" y="146" width="13" height="22" rx="6.5" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <rect x="103" y="146" width="13" height="22" rx="6.5" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <ellipse cx="90.5" cy="170" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="109.5" cy="170" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <rect x="56" y="108" width="18" height="30" rx="9" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <circle cx="65" cy="140" r="8" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="126" y="108" width="18" height="30" rx="9" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <circle cx="135" cy="140" r="8" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="72" y="100" width="56" height="52" rx="16" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <path d="M100 104 L100 148" stroke="#303030" stroke-width="2.5"/>
+    <rect x="93" y="88" width="14" height="18" rx="5" fill="#6E6D6C" stroke="#303030" stroke-width="4"/>
+    <circle cx="100" cy="66" r="28" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <path d="M100 42 L100 56" stroke="#6E6D6C" stroke-width="2.5"/>
+  </g>
+  <g id="eyes">
+    <!-- rear view: no visible face -->
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">BYTE</text>
+</svg>

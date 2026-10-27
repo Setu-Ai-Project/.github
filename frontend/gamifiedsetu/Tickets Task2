@@ -1,0 +1,840 @@
+# SetuAI Frontend — Wave 3 Tickets (Step 6 + Step 7)
+
+## How to use this file
+
+- **Find your task** (Task 0, 8–14). Each task lists every file to create, the data shapes, the exact on-screen text, the behaviour and the tests. You never need to read another task to do yours. The shared **Project context** below applies to every task.
+- **Working with an AI agent:** copy the **Project context** section below **plus** your whole task (from its `## TASK` heading down to the next `---` line), and paste both into your agent with this instruction:
+  > Implement this ticket in my project. Create exactly the files listed, follow every rule and use the exact on-screen text given. Then write the tests described. Do not edit any other files.
+- **Then you are the reviewer of the agent's work:** read every file it wrote, ask it to explain anything you don't understand, run the checks in "Done when", and fix what fails. You own the result, not the agent.
+- The backend isn't ready, so **both features run on mock (fake) data** inside the frontend. A single `USE_MOCK` switch per feature connects the real backend later.
+
+## Project context (applies to every task — paste it with your task)
+
+- **App:** SetuAI, a gamified learning app for kids. Frontend project root: `frontend/gamifiedsetu`. All paths in the tasks are relative to it unless they say "repo root" (the folder that contains `frontend/` and `backend/`).
+- **Stack:** Next.js 16 (App Router), React 19, TypeScript (strict), Tailwind CSS v4. Tests use Vitest + React Testing Library + user-event in a jsdom environment (which has `localStorage`), with jest-dom matchers loaded. Task 0 sets the tests up. Next.js 16 differs from older versions, so check `node_modules/next/dist/docs/` before relying on memory.
+- **Imports:** `@/` points to the project root, and there is **no `src/` folder**. For example: `@/types/submission`, `@/api/doubtApi`, `@/app/components/...`.
+- **Folders:**
+  - Shared types go in `types/`.
+  - The fake/real API wrappers go in the root-level `api/`.
+  - Hooks go in `hooks/`.
+  - React contexts go in `context/`.
+  - Components go in `app/components/<feature>/`.
+  - Dev/test pages go in `app/dev/<name>/page.tsx`.
+  - Tests sit next to the file they test, as `<Name>.test.ts(x)`.
+- **Never create anything under `app/api/`.** In the App Router that folder is for server route handlers.
+- **Exports:** components are default exports. Hooks, providers, functions, constants and types are named exports.
+- **Client code:** any file that uses state, effects, refs, context or event handlers starts with `"use client";`. Code that touches `window`/`localStorage` checks `typeof window !== "undefined"` first, because Next.js also renders on the server.
+- **Styling:** Tailwind with the brand tokens from `app/globals.css` only. Don't invent colours.
+  - Colours: `bg-cream`, `bg-coral`, `bg-tealpop`, `bg-white`, `text-ink`, `border-ink`, `text-taskgray`.
+  - Font: `font-display`.
+  - Card look: `rounded-2xl border-4 border-ink bg-white shadow-[8px_8px_0_#172A32]`.
+  - Button look: `rounded-2xl border-4 border-ink font-display font-bold text-ink shadow-[4px_4px_0_#172A32]`. Add a small lift on hover, and make it faded with a not-allowed cursor when disabled.
+  - Error boxes: `border-2 border-coral` with rounded corners. Never leave a blank screen.
+- **Lint rule `react-hooks/set-state-in-effect` is on.** Inside `useEffect`, never call a function that sets state; `useEffect(() => { refresh(); }, [])` **fails lint**. Use the **reloadKey pattern** to load data:
+  - Start the API call inside the effect and handle it with a promise chain (`.then` / `.catch` / `.finally`).
+  - Keep an `ignore` flag that the effect's cleanup sets to true, and skip setting state once it's true.
+  - Keep a `reloadKey` number in state, in the effect's dependency list. Increment it to reload.
+- **Double-click guard:** for any button that starts an async call, keep a `useRef(false)` "in flight" flag. Return early if it's true, set it to true before the call, and reset it in `finally`. A ref changes instantly; state only changes on the next render.
+- **Tests:**
+  - Import `describe`, `it`, `expect` and `vi` from `vitest`.
+  - Mock a module with `vi.mock("<path>", () => ({ name: vi.fn() }))`, and get a typed handle with `vi.mocked(name)`.
+  - Use `userEvent.setup()` for typing and clicking.
+  - Use `renderHook` + `act` for hooks.
+  - Use `findBy...` queries to wait for async results.
+  - Use `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync(ms)` to skip delays.
+- **Checks before every PR:** `npx vitest run`, `npx tsc --noEmit` and `npm run lint` must all pass.
+
+## Team rules (for everyone)
+
+1. **Own branch, never `main`.** Branch from the latest `main` using the name in your task. Push your branch and open a Pull Request. Never push straight to `main`.
+2. **Only touch the files your task owns.** Need a change in someone else's file? Ask them.
+3. **You test what you build.** A PR is ready only when `npx vitest run`, `npx tsc --noEmit` and `npm run lint` all pass.
+4. **Keep your dev page** under `app/dev/`. Don't delete it afterwards — the team uses it to re-check your work.
+5. **Only Task 0 changes `package.json`.** Everyone else pulls `main` after Task 0 is merged.
+6. **Use npm only.** Never run `pnpm` or `yarn`. The only lockfile is `package-lock.json`. After pulling `main`, run `npm install`.
+7. **Respect the merge order** written in each step's overview. You can start writing your files straight away; you can only *run* them once the files you depend on are on `main`.
+8. **Use the PR checklist below** in every PR description (Task 0 adds it as a template so it appears automatically).
+
+### PR checklist
+
+- [ ] Title starts with the ticket, e.g. `[Step 6][Task 9] SubmitButton, FeedbackList, useSubmission`
+- [ ] I only changed the files my ticket owns
+- [ ] I added the tests from my ticket and `npx vitest run` passes
+- [ ] `npx tsc --noEmit` and `npm run lint` are clean
+- [ ] My dev page under `app/dev/` is kept and works
+- [ ] Screenshot or short GIF of my dev page attached
+- [ ] `USE_MOCK = true` and `MOCK_FORCE_ERROR = false` (not changed for testing)
+- [ ] Every "Definition of Done" box in my ticket is ticked
+- [ ] Step 7 only: the PR description says "Mode switch is UI-only; a real mentor role check is still needed"
+- [ ] Reviewer: one teammate from my pair has approved
+
+---
+
+## TASK 0 — Test Setup, PR Template + Shared Env Variable
+
+**Owner:** ____________ **Branch:** `feature/wave3-task0-test-setup`
+**Depends on:** nothing — do this first, it's small (about half a day).
+**Blocks:** every other task in this file (they all need the test tools). Post "Wave 3 test setup is on main" in the team channel when merged.
+
+### Goal
+Add the testing tools the whole team uses (Vitest + React Testing Library), a pull-request template, and the shared API URL variable — so Tasks 8–14 can write and run tests from day one.
+
+### Files to create / change
+```
+frontend/gamifiedsetu/
+├── package.json            (change: dev dependencies + "test" script)
+├── package-lock.json       (changes automatically)
+├── vitest.config.mts       (new)
+├── vitest.setup.ts         (new)
+├── tests/smoke.test.tsx    (new)
+└── .env.example            (change: add one variable name)
+<repo root>/.github/pull_request_template.md   (new)
+```
+
+### What to build
+
+**1. Install the test tools** — run inside `frontend/gamifiedsetu`:
+```
+npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom @testing-library/user-event vite-tsconfig-paths
+```
+Confirm they appear in `frontend/gamifiedsetu/package.json` under `devDependencies` — **not** in a parent folder's `package.json`. Then add a script named `test` whose command is `vitest`.
+
+**2. `vitest.config.mts`** (next to `package.json`). A Vitest config that:
+- uses two Vite plugins: the tsconfig-paths plugin (so `@/...` imports work in tests) and the React plugin;
+- sets the test environment to `jsdom` (a fake browser);
+- registers `./vitest.setup.ts` as a setup file.
+
+**3. `vitest.setup.ts`**. Runs before every test file. It must:
+- import the Vitest flavour of jest-dom (`@testing-library/jest-dom/vitest`) so matchers like `toBeInTheDocument`, `toBeDisabled`, `toHaveValue` exist;
+- after each test, call Testing Library's `cleanup` so rendered components don't leak into the next test.
+
+**4. `tests/smoke.test.tsx`**. One tiny example test the team can copy the shape of: render a `<p>` with the text "SetuAI tests work" and expect that text to be in the document. Import `describe`, `it`, `expect` from `vitest` and `render`, `screen` from `@testing-library/react`.
+
+**5. `.env.example`**. Add the variable name `NEXT_PUBLIC_API_URL=` (no value) under the existing ones. Both features will read the backend address from it later.
+
+**6. `<repo root>/.github/pull_request_template.md`**. GitHub shows this text in every new PR. Content: a "What this PR does" heading with a blank line for the description, a "Ticket" line, then the **PR checklist** from the Team rules section above as markdown checkboxes.
+
+### Tests to write
+- `tests/smoke.test.tsx` as described — it proves the setup works.
+
+### Done when
+1. `npx vitest run` → 1 test file, passing.
+2. `npx tsc --noEmit` → no output. `npm run lint` → no errors.
+3. Open a draft PR on GitHub — the template text appears automatically.
+
+### Definition of Done
+- [ ] Test tools are in `frontend/gamifiedsetu/package.json` `devDependencies`; `npm test` starts Vitest
+- [ ] `@/` imports work inside tests
+- [ ] Smoke test passes
+- [ ] `.env.example` has `NEXT_PUBLIC_API_URL=` with no value
+- [ ] PR template exists at `<repo root>/.github/pull_request_template.md`
+- [ ] Merged first and announced in the team channel
+
+---
+
+# STEP 6 (Pair F1) — Submission & Feedback UI
+
+**The feature:** a learner types an answer to a challenge and presses **Submit**. The screen shows it's checking, then either **Passed!** with XP earned, or **Needs revision** with specific tips and a **Try again** button that keeps their typed answer. Built on mock data.
+
+| Learner does | Screen shows |
+|---|---|
+| Types an answer, presses Submit | Button says "Checking..." and is disabled; a cream "Checking..." badge |
+| Answer is wrong | Coral "Needs revision" badge, a bulleted list of tips, a "Try again" button |
+| Presses Try again | Badge and tips disappear, the typed answer stays, Submit is back |
+| Answer is right (`correct`) | Teal "Passed!" badge and "You earned 50 XP! Total XP: 50"; Submit is gone |
+| Server fails | "We could not check your answer. Please try again in a moment." |
+
+**Tasks:** Task 8 (data + mock + badge) · Task 9 (button + list + hook) · Task 10 (panel + demo page).
+**Merge order:** Task 0 → Task 8 → Task 9 → Task 10.
+
+---
+
+## TASK 8 — Submission Types, Mock API + StatusBadge
+
+**Owner:** ____________ **Branch:** `feature/step6-task8-data-mock-badge`
+**Depends on:** Task 0 (test setup) on `main`.
+**Blocks:** Tasks 9 and 10 import your types and `submitAnswer`. **Open a first PR with just the types file as soon as it's written** and post "Step 6 types are on main", then finish the rest in a second PR.
+
+### Goal
+Create the shared data types for a submission, a fake backend that answers like the real one, the single `submitAnswer()` function the app calls, and a coloured `StatusBadge` pill.
+
+### Files to create
+```
+types/submission.ts
+api/mockSubmission.ts
+api/mockSubmission.test.ts
+api/submissionApi.ts
+api/submissionApi.test.ts
+app/components/submission/StatusBadge.tsx
+app/components/submission/StatusBadge.test.tsx
+app/dev/status-badge-test/page.tsx
+```
+
+### What to build
+
+**1. `types/submission.ts`** — the shared contract. Write these **exactly**; Tasks 9 and 10 are built against them.
+- `SubmissionStatus`: a union of exactly `"pending"`, `"passed"`, `"needs_revision"`.
+- `SubmissionResult`: an interface with `status` (a `SubmissionStatus`), `feedback` (array of strings — the tips shown to the learner) and `xpEarned` (number; 0 unless passed).
+- `UiState`: a union of exactly `"idle"`, `"submitting"`, `"done"`, `"error"` (describes the screen, not the server).
+- Add a one-line beginner comment above each.
+
+**2. `api/mockSubmission.ts`** — the fake backend.
+- Export constants `MOCK_FORCE_ERROR = false` (comment: flip to true only locally to test the error message; never commit it as true) and `MOCK_DELAY_MS = 1200`.
+- Export `async mockSubmit(answer: string): Promise<SubmissionResult>`:
+  1. Wait `MOCK_DELAY_MS` milliseconds (a promise around `setTimeout`).
+  2. If `MOCK_FORCE_ERROR` is true, throw `new Error("Mock server is down")`.
+  3. If the answer, trimmed and lower-cased, equals `"correct"` → return status `"passed"`, feedback `["Great job!"]`, xpEarned `50`.
+  4. Otherwise → status `"needs_revision"`, xpEarned `0`, feedback exactly: `"Your answer is missing the loop condition."` and `"Hint: check that your counter actually increases."`
+
+**3. `api/submissionApi.ts`** — the only function the app uses to submit.
+- Export constant `USE_MOCK = true` (comment: backend isn't ready; set to false later).
+- Export `async submitAnswer(challengeId: string, answer: string): Promise<SubmissionResult>`:
+  - If `USE_MOCK`, return `mockSubmit(answer)`.
+  - Otherwise `POST` JSON `{ challengeId, answer }` to `` `${process.env.NEXT_PUBLIC_API_URL}/api/submissions` `` with header `Content-Type: application/json`; if the response isn't ok throw `new Error("Submission request failed")`; return the parsed JSON.
+
+**4. `app/components/submission/StatusBadge.tsx`** — a small pill showing the status.
+- Default export `StatusBadge`, props `{ status: SubmissionStatus }`. No other props, no API calls (the AI Prompt-Challenge screen will reuse it).
+- Use a lookup object typed as `Record<SubmissionStatus, { label: string; classes: string }>` so TypeScript forces a style for every status:
+  - `pending` → label "Checking...", class `bg-cream`
+  - `passed` → label "Passed!", class `bg-tealpop`
+  - `needs_revision` → label "Needs revision", class `bg-coral`
+- Render a `<span>` with the label; shared classes `inline-block rounded-full border-2 border-ink px-3 py-1 font-display text-sm font-bold text-ink` plus the status colour class.
+
+**5. `app/dev/status-badge-test/page.tsx`** — a dev page (heading "StatusBadge Test", cream background) that shows all three badges side by side.
+
+### Tests to write
+**`api/mockSubmission.test.ts`** — use fake timers (`vi.useFakeTimers()` before each test, `vi.useRealTimers()` after) and skip the delay with `await vi.advanceTimersByTimeAsync(MOCK_DELAY_MS)` after calling `mockSubmit`.
+1. Given `"correct"`, `"  CORRECT  "` and `"Correct"` → each returns status `"passed"` with xpEarned `50`.
+2. Given `"hello"` → status `"needs_revision"`, exactly 2 feedback items, xpEarned `0`.
+3. Given any answer → it has **not** resolved after `MOCK_DELAY_MS - 1` ms, and has resolved after 1 more ms.
+
+**`api/submissionApi.test.ts`** — mock `./mockSubmission` so `mockSubmit` is a `vi.fn` resolving to a passed result; spy on `globalThis.fetch`.
+1. Calling `submitAnswer("challenge-1", "hello")` → `mockSubmit` was called with `"hello"`, `fetch` was **not** called, and the returned status is `"passed"`.
+
+**`app/components/submission/StatusBadge.test.tsx`**
+1. For each status → the right label is shown and that element has the right colour class (`bg-cream` / `bg-tealpop` / `bg-coral`).
+
+### Done when
+1. `npx vitest run`: your 3 test files pass. `npx tsc --noEmit` and `npm run lint` are clean.
+2. `npm run dev` → http://localhost:3000/dev/status-badge-test shows a cream "Checking...", a teal "Passed!" and a coral "Needs revision" pill, each with an ink border.
+
+### Definition of Done
+- [ ] Types match the contract above exactly; first PR with the types merged early and announced
+- [ ] `submitAnswer` is the only entry point; committed with `USE_MOCK = true` and `MOCK_FORCE_ERROR = false`
+- [ ] Nothing created under `app/api/` or `src/`
+- [ ] `StatusBadge` uses brand tokens only; the three statuses look clearly different
+- [ ] 3 test files pass; type check and lint clean
+- [ ] `/dev/status-badge-test` kept
+
+---
+
+## TASK 9 — SubmitButton, FeedbackList + useSubmission Hook
+
+**Owner:** ____________ **Branch:** `feature/step6-task9-button-feedback-hook`
+**Depends on:** Task 0, and Task 8's **types** on `main` (you can write the two components before that — they import nothing). Your hook test mocks `submitAnswer`, so you don't need Task 8's mock to run it.
+**Blocks:** Task 10 uses all three pieces. Post in the channel when merged.
+
+### Goal
+Build the Submit button that locks itself while checking, a reusable list of tips, and the `useSubmission` hook — the "brain" that tracks status, feedback, XP and retry so the visual components stay simple.
+
+### Files you use but don't edit (from Task 8)
+- `@/types/submission` exports `SubmissionStatus` (`"pending" | "passed" | "needs_revision"`), `SubmissionResult` (`{ status, feedback: string[], xpEarned: number }`) and `UiState` (`"idle" | "submitting" | "done" | "error"`).
+- `@/api/submissionApi` exports `async submitAnswer(challengeId: string, answer: string): Promise<SubmissionResult>`. It throws if the server fails.
+
+### Files to create
+```
+app/components/submission/SubmitButton.tsx
+app/components/submission/SubmitButton.test.tsx
+app/components/submission/FeedbackList.tsx
+app/components/submission/FeedbackList.test.tsx
+hooks/useSubmission.ts
+hooks/useSubmission.test.ts
+app/dev/submission-ui-test/page.tsx
+```
+
+### What to build
+
+**1. `SubmitButton.tsx`** — default export, props `{ onClick: () => void; loading: boolean; disabled?: boolean }` (disabled defaults to false).
+1. A `<button type="button">` that calls `onClick`.
+2. Disabled when `loading` **or** `disabled` is true.
+3. Text is exactly "Checking..." while loading, otherwise "Submit".
+4. Coral button in the button look described above.
+
+**2. `FeedbackList.tsx`** — default export, props `{ items: string[] }`. A generic list of tips (the AI Prompt-Challenge screen will reuse it).
+1. If `items` is empty, render nothing at all (return `null`).
+2. Otherwise a bulleted `<ul>` (`list-disc`, left padding, small spacing, `text-ink`) with one `<li>` per item, in order.
+
+**3. `hooks/useSubmission.ts`** — starts with `"use client"`. Named export `useSubmission(challengeId: string)` returning exactly `{ result, uiState, totalXp, submit, retry }`.
+- State: `result` (`SubmissionResult | null`, starts null), `uiState` (`UiState`, starts `"idle"`), `totalXp` (number, starts 0).
+- `submit(answer)` (async):
+  1. **Double-click guard:** keep a `useRef(false)` "in flight" flag. If it's already true, return immediately. Otherwise set it true before doing anything else, and set it back to false in a `finally` block. (A ref changes instantly; state only changes on the next render, so state alone can't stop a fast double-click.)
+  2. Set `uiState` to `"submitting"` and immediately set `result` to a pending placeholder: status `"pending"`, empty feedback, 0 XP.
+  3. Call `submitAnswer(challengeId, answer)`. On success: store the response as `result`, set `uiState` to `"done"`, and if the status is `"passed"` add its `xpEarned` to `totalXp` (use the functional form of the state setter).
+  4. On error: set `result` to null and `uiState` to `"error"`.
+- `retry()`: set `result` to null and `uiState` to `"idle"`. It does **not** touch the learner's typed answer — that lives in the panel (Task 10).
+- `totalXp` is in-memory only and resets on reload — that's expected for now.
+
+**4. `app/dev/submission-ui-test/page.tsx`** — `"use client"` dev page (heading "SubmitButton + FeedbackList Test") showing: one SubmitButton with loading false that logs to the console when clicked, one with loading true, one with `disabled`, and a FeedbackList with two tips.
+
+### Tests to write
+**`SubmitButton.test.tsx`**
+1. loading false → a button named "Submit" that is enabled.
+2. loading true → a button named "Checking..." that is disabled.
+3. disabled true → "Submit" is disabled.
+4. Clicking an enabled button calls `onClick` once.
+5. Clicking while loading does not call `onClick`.
+
+**`FeedbackList.test.tsx`**
+1. Given two tips → two list items, in the same order, with the right text.
+2. Given an empty array → the rendered container is empty.
+
+**`hooks/useSubmission.test.ts`** — mock `@/api/submissionApi` so `submitAnswer` is a `vi.fn`; reset it before each test.
+1. Initially → uiState `"idle"`, result null, totalXp 0.
+2. While `submitAnswer` hasn't resolved yet (return a promise you resolve manually) → uiState `"submitting"` and result status `"pending"`; after resolving → uiState `"done"`.
+3. Calling `submit("correct")` passes `"c1"` (the challengeId) and `"correct"` to `submitAnswer`.
+4. A passed result with 50 XP → result status `"passed"`, totalXp 50.
+5. A needs_revision result → 2 feedback items kept, totalXp stays 0.
+6. `submitAnswer` rejects → uiState `"error"`, result null.
+7. After a result, `retry()` → uiState `"idle"`, result null.
+8. Calling `submit` twice in the same tick → `submitAnswer` called only once.
+
+### Done when
+1. `npx vitest run`: your 3 test files pass (plus everyone else's). Type check and lint are clean.
+2. http://localhost:3000/dev/submission-ui-test: the first button logs on click; the "Checking..." and disabled buttons look faded and do nothing; a two-bullet list shows below.
+
+### Definition of Done
+- [ ] `SubmitButton` and `FeedbackList` take props only (no API or hook imports), brand tokens only
+- [ ] `useSubmission` starts with `"use client"` and returns exactly `{ result, uiState, totalXp, submit, retry }`
+- [ ] XP only increases on `"passed"`; the double-click guard is proven by test 8
+- [ ] 3 test files pass; type check and lint clean
+- [ ] `/dev/submission-ui-test` kept
+
+---
+
+## TASK 10 — SubmissionPanel + Demo Page
+
+**Owner:** ____________ **Branch:** `feature/step6-task10-submission-panel`
+**Depends on:** Tasks 8 and 9 merged to run it. **Start immediately anyway:** build the layout and styling with temporary hard-coded values (e.g. pretend the result is needs_revision with two tips), then swap in the real hook once Task 9 merges.
+**Blocks:** nothing — you complete the feature.
+
+### Goal
+Combine everything into the full submission area — answer box, Submit button, status badge, tips, Try again, success + XP message and a friendly error — plus a demo page that runs the whole flow.
+
+### Files you use but don't edit
+- `@/types/submission`: `SubmissionResult` = `{ status: "pending" | "passed" | "needs_revision", feedback: string[], xpEarned: number }`.
+- `@/api/submissionApi`: `submitAnswer(challengeId, answer)` → `Promise<SubmissionResult>` (throws on failure).
+- `@/hooks/useSubmission`: `useSubmission(challengeId)` → `{ result, uiState, totalXp, submit(answer), retry() }`. `uiState` is `"idle" | "submitting" | "done" | "error"`; while submitting, `result.status` is `"pending"`; on error `result` is null.
+- `app/components/submission/StatusBadge.tsx`: `<StatusBadge status={...} />` → "Checking..." / "Passed!" / "Needs revision".
+- `app/components/submission/SubmitButton.tsx`: `<SubmitButton onClick loading disabled? />` → "Submit" / "Checking...".
+- `app/components/submission/FeedbackList.tsx`: `<FeedbackList items={string[]} />`.
+- Optional mascots: `app/components/mascots/SparkCard.tsx` and `NovaBanner.tsx`, both default exports taking exactly `{ message: string; onDismiss: () => void }`.
+
+### Files to create
+```
+app/components/submission/SubmissionPanel.tsx
+app/components/submission/SubmissionPanel.test.tsx
+app/dev/submission/page.tsx
+```
+
+### What to build
+
+**1. `SubmissionPanel.tsx`** — `"use client"`, default export, props `{ challengeId: string }`.
+1. Keep the typed answer in the panel's own `useState` (not in the hook), so Try again keeps it. Get everything else from `useSubmission(challengeId)`.
+2. A labelled textarea: label text "Your answer" (connected via `htmlFor`/`id`), placeholder "Type your answer here...". It is a controlled input. Disabled while checking (`uiState` is `"submitting"`) or after a pass.
+3. The SubmitButton is shown only when the result is neither passed nor needs_revision. `loading` = checking; `disabled` = the answer is empty or only spaces. Clicking calls `submit(answer)`.
+4. A results area wrapped in an element with `aria-live="polite"` (so screen readers announce changes) containing:
+   - the StatusBadge whenever there is a result;
+   - for needs_revision: the FeedbackList of `result.feedback` and a "Try again" button (white version of the button look) that calls `retry()` — the textarea text must stay;
+   - for passed: the text "You earned {xpEarned} XP! Total XP: {totalXp}" (e.g. "You earned 50 XP! Total XP: 50");
+   - for `uiState === "error"`: "We could not check your answer. Please try again in a moment." in a box with a coral border. Never show a blank panel.
+5. Styling: the card look, comfortable padding, full width up to about `max-w-xl`; textarea with an ink border, cream background, rounded corners. Must work at 375px wide with nothing overflowing.
+
+**2. `app/dev/submission/page.tsx`** — a demo page on a cream background with the heading "Submission Demo", a hint line "Type correct to pass. Anything else needs revision.", and `<SubmissionPanel challengeId="test-challenge-1" />`.
+
+**3. Mascot polish (optional, only after all tests pass)** — show `NovaBanner` with "So close! Read the tips, fix your answer and try again." under needs_revision, and `SparkCard` with "Brilliant! You nailed it." under passed. If tests then fail because of images, mock `next/image` in the test file with a plain `<img>`.
+
+### Tests to write
+**`SubmissionPanel.test.tsx`** — mock `@/api/submissionApi` so `submitAnswer` answers **instantly** with the same rule as the mock: `"correct"` (trimmed, any case) → passed, feedback `["Great job!"]`, 50 XP; anything else → needs_revision with two tips, 0 XP.
+1. **Full journey:** type "hello", click "Submit" → "Needs revision" appears with 2 list items and no "Submit" button; click "Try again" → the textarea still contains "hello" and "Needs revision" is gone; clear it, type "correct", click "Submit" → "Passed!" and "You earned 50 XP! Total XP: 50" appear, there is no "Submit" button, the textarea is disabled, and `submitAnswer` was called twice.
+2. Empty textarea → "Submit" is disabled; typing only spaces → still disabled.
+3. `submitAnswer` rejects → the friendly error text appears and "Submit" is enabled again.
+4. After a result appears, the badge is inside an element with `aria-live="polite"`.
+
+### Done when
+1. `npx vitest run`: all Step 6 test files pass. Type check and lint clean.
+2. At http://localhost:3000/dev/submission:
+   - "hello" → Checking... (about 1 second) → coral Needs revision + 2 tips.
+   - Try again keeps "hello".
+   - "correct" → teal Passed! + "You earned 50 XP! Total XP: 50", the button is gone and the box is locked.
+   - No red console errors.
+3. Edge cases:
+   - Empty or blank answer can't be submitted.
+   - Set `MOCK_FORCE_ERROR = true` locally → the friendly error shows → set it back (don't commit it).
+   - A fast double-click runs only one check.
+   - Works at 375px wide.
+
+### Definition of Done
+- [ ] Pending, passed and needs_revision are clearly different; tips are specific; Try again keeps the text
+- [ ] After a pass the Submit button is gone and the box is locked; XP shown
+- [ ] Server failure shows the friendly message, never a blank panel
+- [ ] Results area has `aria-live="polite"`; brand tokens only; works at 375px
+- [ ] 4 tests pass; type check and lint clean
+- [ ] `/dev/submission` kept
+
+---
+
+## FINAL — Step 6 Team Check (Tasks 8, 9, 10 together)
+
+Done **together** once Tasks 8–10 are merged — not one person's job.
+1. Everyone pulls `main` and runs `npm install`.
+2. `npx vitest run` — all Step 6 test files (7) plus the smoke test pass. `npx tsc --noEmit` and `npm run lint` are clean.
+3. Each owner opens their own dev page (`/dev/status-badge-test`, `/dev/submission-ui-test`, `/dev/submission`) and confirms it still works.
+4. Together, run Task 10's "Done when" steps 2 and 3 on one screen.
+5. Anything broken → the file's owner fixes it on a new branch **with a test that would have caught it**.
+6. Post the handoff in the team channel:
+   - **Done:** the submission panel with three states, retry keeps the text, XP on pass, friendly errors, tests.
+   - **Mocked:** `api/mockSubmission.ts` (`USE_MOCK = true`).
+   - **Reusable:** `StatusBadge` and `FeedbackList` live in `app/components/submission/`.
+
+**Later, when the backend is ready:** set `NEXT_PUBLIC_API_URL` in your local `.env`, flip `USE_MOCK` to `false` in `api/submissionApi.ts`, restart `npm run dev`. If field names differ, update `types/submission.ts` first and fix what TypeScript underlines.
+
+---
+
+# STEP 7 (Pair F2) — Mentor Mode & Mode-Switch UI
+
+**The feature:** a learner asks a question (a **doubt**); it lands in a queue; a **mentor** sees open doubts oldest first and replies; the learner then sees the reply. A **Learner / Mentor** switch flips the same page between the two views. Built on mock data saved in the browser's `localStorage`, so both views share data and it survives a reload.
+
+| Who | Does | Sees |
+|---|---|---|
+| Learner | Types a question, presses "Send doubt" | "Doubt sent! A mentor will reply soon." and a cream **Open** card in "My doubts" |
+| Mentor | Clicks **Mentor** | Tab **Open (1)** with the doubt and a reply box |
+| Mentor | Writes a reply, presses "Send reply" | The doubt moves to **Answered (1)** |
+| Learner | Clicks **Learner** | The same card is teal **Answered** with "Test Mentor says:" and the reply |
+| Anyone | Reloads | Everything is still there |
+
+**Tasks:** Task 11 (data + mock + card) · Task 12 (mode switch + page + journey test) · Task 13 (learner side) · Task 14 (mentor side).
+**Merge order:** Task 0 → Task 11 → Task 12 (switch) → Tasks 13 and 14 (any order) → Task 12 (final page wiring).
+**Important:** the Learner/Mentor switch is for development only. In the real app a learner must not become a mentor by clicking a button — a real role check comes later from login/backend. Every Step 7 PR says so.
+
+---
+
+## TASK 11 — Doubt Types, Mock Doubt Queue + DoubtCard
+
+**Owner:** ____________ **Branch:** `feature/step7-task11-doubt-data-card`
+**Depends on:** Task 0 on `main`.
+**Blocks:** Tasks 12, 13 and 14 import your types and API; 13 and 14 use `DoubtCard`. **Open a first PR with the types + mock + API as soon as they pass their tests** and post "Step 7 doubt API is on main"; then `DoubtCard` in a second PR.
+
+### Goal
+Create the shared doubt types, a fake doubt queue that persists in `localStorage`, the three API functions the app calls, and `DoubtCard`, which displays one doubt in both the learner and mentor views.
+
+### Files to create
+```
+types/doubt.ts
+api/mockDoubtApi.ts
+api/mockDoubtApi.test.ts
+api/doubtApi.ts
+api/doubtApi.test.ts
+app/components/mentor-mode/DoubtCard.tsx
+app/components/mentor-mode/DoubtCard.test.tsx
+app/dev/doubt-card-test/page.tsx
+```
+
+### What to build
+
+**1. `types/doubt.ts`** — the shared contract. Write these **exactly**; Tasks 12–14 are built against them. One beginner comment above each.
+- `Mode`: union of `"learner"` and `"mentor"`.
+- `DoubtStatus`: union of `"open"` and `"answered"`.
+- `MentorReply`: interface with `mentorName` (string), `text` (string), `repliedAt` (string, ISO date like `"2026-10-02T10:30:00.000Z"`).
+- `Doubt`: interface with `id` (string), `learnerName` (string), `question` (string), `status` (`DoubtStatus`), `createdAt` (string, ISO date), and an **optional** `reply` (`MentorReply`) that is missing until a mentor answers.
+
+**2. `api/mockDoubtApi.ts`** — the fake queue.
+- Export constants: `MOCK_FORCE_ERROR = false` (comment: only flip locally, never commit as true), `MOCK_DELAY_MS = 400`, `MOCK_STORAGE_KEY = "setuai_mock_doubts"`.
+- Private helpers:
+  - `load()` reads the JSON array from `localStorage` under the key; returns `[]` if not in a browser, if nothing is stored, or if the JSON is broken.
+  - `save(list)` writes the array back.
+  - A "fake network" helper waits `MOCK_DELAY_MS` and then throws `new Error("Mock server is down")` if `MOCK_FORCE_ERROR` is true. Every exported async function calls it first.
+- Export `async mockListDoubts(): Promise<Doubt[]>` → all stored doubts.
+- Export `async mockCreateDoubt(question, learnerName): Promise<Doubt>` → a new doubt with `id` from `crypto.randomUUID()`, status `"open"`, `createdAt` = now as ISO string, no reply. Append it, save, and return it.
+- Export `async mockReplyToDoubt(id, text, mentorName): Promise<Doubt>`:
+  1. Find the doubt. If it's missing, throw an Error.
+  2. Build a **new** object (don't mutate the old one) with status `"answered"` and `reply` = `{ mentorName, text, repliedAt: now }`.
+  3. Save the list with that doubt replaced, and return the new object.
+- Export `resetMockDoubts()` (not async) → removes the storage key (browser only). Used by tests and dev pages.
+
+**3. `api/doubtApi.ts`** — the only way the app talks to the queue (dev pages may also call `resetMockDoubts`).
+- Export `USE_MOCK = true` (comment: backend isn't ready).
+- `async listDoubts(): Promise<Doubt[]>`:
+  - Mock: `mockListDoubts()`.
+  - Real: `GET` `` `${process.env.NEXT_PUBLIC_API_URL}/api/doubts` ``. If the response isn't ok, throw "Could not load doubts".
+- `async createDoubt(question, learnerName): Promise<Doubt>`:
+  - Mock: `mockCreateDoubt(...)`.
+  - Real: `POST` JSON `{ question, learnerName }` to `/api/doubts`. If it fails, throw "Could not send doubt".
+- `async replyToDoubt(id, text, mentorName): Promise<Doubt>`:
+  - Mock: `mockReplyToDoubt(...)`.
+  - Real: `POST` JSON `{ text, mentorName }` to `` `/api/doubts/${id}/reply` ``. If it fails, throw "Could not send reply".
+
+**4. `app/components/mentor-mode/DoubtCard.tsx`** — default export, props `{ doubt: Doubt }`, display only.
+1. The root element is an `<article>` with the card look.
+2. **Top row:**
+   - The question in bold, with `break-words` so very long text wraps.
+   - On the right, a badge: "Answered" with `bg-tealpop` when status is answered, otherwise "Open" with `bg-cream`. It's a rounded pill with an ink border, `font-display`, small bold text.
+3. Below, small grey text: "Asked by {learnerName}".
+4. If `doubt.reply` exists: a cream box with an ink border containing "{mentorName} says:" (bold, `font-display`) and the reply text (`break-words`). Otherwise grey text: "Waiting for a mentor to reply...".
+
+**5. `app/dev/doubt-card-test/page.tsx`** — a dev page (heading "DoubtCard Test", cream background) showing three hard-coded doubts:
+- An open doubt: "How do I stop an infinite loop?"
+- An answered doubt, with a reply from "Test Mentor".
+- An open doubt with a very long question, including one very long unbroken word.
+
+### Tests to write
+**`api/mockDoubtApi.test.ts`** — before each test: fake timers on and `resetMockDoubts()`; after each: real timers. To run a call, start it, `await vi.advanceTimersByTimeAsync(MOCK_DELAY_MS)`, then await it.
+1. The list starts empty.
+2. Creating a doubt → status "open", the same question and learnerName, no reply; listing returns exactly that doubt.
+3. Two created doubts have different ids.
+4. Replying → returned doubt is "answered" with the reply text and mentorName; listing again shows it answered.
+5. After creating, `localStorage.getItem(MOCK_STORAGE_KEY)` contains the question text.
+6. Replying to an unknown id rejects. Attach the `rejects` expectation **before** advancing the timers.
+
+**`api/doubtApi.test.ts`** — mock `./mockDoubtApi` (the three functions as `vi.fn`s that resolve instantly) and spy on `globalThis.fetch`.
+1. Calling all three API functions → each mock function was called with the same arguments, and `fetch` was never called.
+
+**`DoubtCard.test.tsx`**
+1. Open doubt → shows the question, an "Open" badge with class `bg-cream`, and "Waiting for a mentor to reply...".
+2. Answered doubt → "Answered" badge with class `bg-tealpop`, "Test Mentor says:" and the reply text, and no waiting text.
+3. Shows "Asked by Test Learner".
+
+### Done when
+1. `npx vitest run`: your 3 test files pass. Type check and lint are clean.
+2. At http://localhost:3000/dev/doubt-card-test you see:
+   - A cream "Open" card.
+   - A teal "Answered" card with a reply box.
+   - A long question that wraps inside its card, with no sideways scrolling at 375px wide.
+
+### Definition of Done
+- [ ] Types match the contract exactly; first PR (types + mock + API) merged early and announced
+- [ ] Mock persists under `setuai_mock_doubts`, waits 400ms, uses `crypto.randomUUID()`
+- [ ] Committed with `USE_MOCK = true`, `MOCK_FORCE_ERROR = false`; nothing under `app/api/`
+- [ ] `DoubtCard` is display-only, brand tokens only, wraps long text
+- [ ] 3 test files pass; type check and lint clean
+- [ ] `/dev/doubt-card-test` kept
+
+---
+
+## TASK 12 — ModeContext, ModeSwitch, Mentor Mode Page + Journey Test
+
+**Owner:** ____________ **Branch:** `feature/step7-task12-mode-switch` (PR #1), later `feature/step7-task12-mentor-page` (PR #2)
+**Depends on:** Task 11's types for PR #1. Tasks 13 and 14 merged for PR #2.
+**Blocks:** nothing — your page is the last piece. **No idle time:** while 13 and 14 are being built, write the journey test (it's specified fully below) and the Step 7 handoff note.
+
+### Goal
+Build:
+- A shared "current mode" (learner or mentor) that any component can read.
+- The Learner/Mentor pill switch that changes it.
+- The `/dev/mentor` page joining the learner and mentor views.
+- The automated test of the whole learner → mentor → learner journey.
+
+### Files you use but don't edit
+- `@/types/doubt` exports `Mode` (`"learner" | "mentor"`).
+- `@/api/mockDoubtApi` exports `resetMockDoubts()` — empties the fake queue (for tests).
+- From Task 13 (PR #2 only): `app/components/mentor-mode/MyDoubts.tsx` — default export `MyDoubts`, no props. It is the whole learner view, containing:
+  - A form with label "Ask a doubt" and a "Send doubt" button.
+  - Messages "Doubt sent! A mentor will reply soon." etc.
+  - Doubt cards with an "Open"/"Answered" badge, and "Test Mentor says:" plus the reply when answered.
+- From Task 14 (PR #2 only): `app/components/mentor-mode/MentorDashboard.tsx` — default export `MentorDashboard`, no props. It is the whole mentor view, containing:
+  - Tab buttons named "Open (n)" and "Answered (n)".
+  - For each open doubt, a text input labelled "Reply to: {question}" and a "Send reply" button.
+
+### Files to create
+```
+context/ModeContext.tsx
+context/ModeContext.test.tsx
+app/components/mentor-mode/ModeSwitch.tsx
+app/components/mentor-mode/ModeSwitch.test.tsx
+app/dev/mentor/page.tsx
+app/dev/mentor/page.test.tsx
+```
+
+### What to build
+
+**1. `context/ModeContext.tsx`** — `"use client"`. A React context holding `{ mode: Mode; setMode: (mode: Mode) => void }`.
+- Named export `ModeProvider` with props `{ children; initialMode?: Mode }` (default `"learner"`). It keeps the mode in `useState` and provides `{ mode, setMode }`.
+- Named export hook `useMode()` returns the context value. If used outside a `ModeProvider` (the context is null), throw `new Error("useMode must be used inside <ModeProvider>")`.
+
+**2. `app/components/mentor-mode/ModeSwitch.tsx`** — `"use client"`, default export, no props; uses `useMode()`.
+1. A wrapper with `role="group"` and `aria-label="Switch mode"`, styled as a white pill with a thick ink border and hard shadow.
+2. Two `type="button"` buttons, "Learner" and "Mentor". Clicking one calls `setMode` with its value.
+3. Each button has `aria-pressed` set to whether it is the current mode. The active one has `bg-tealpop`; the inactive one gets a cream hover.
+
+**3. `app/dev/mentor/page.tsx`** — `"use client"`, default export `MentorModePage`.
+- Layout: everything inside `<ModeProvider>`; a cream page with a centred column (max width about `max-w-2xl`), a top row holding the heading "Mentor Mode" and the `ModeSwitch`, and below it the current view.
+- **PR #1 version:** the view is placeholder text — "Learner view goes here" or "Mentor view goes here" depending on the mode.
+- **PR #2 version** (after Tasks 13 and 14 merge): the view is `<MyDoubts />` in learner mode and `<MentorDashboard />` in mentor mode. Switching unmounts one and mounts the other, and each loads fresh data when it appears — that's how the learner sees a new reply immediately.
+
+**4. Step 7 handoff note** — draft it in your PR #2 description; the team posts it in the Final step:
+- **Done:** what was built.
+- **Mocked:** all data comes from `localStorage` via `api/mockDoubtApi.ts`.
+- **Still needed before launch:**
+  - A real mentor role check.
+  - Real names from login instead of "Test Learner"/"Test Mentor".
+  - The learner seeing only their own doubts.
+- **Reusable:** `DoubtCard`, `ModeSwitch`, `ModeProvider`/`useMode`.
+
+### Tests to write
+**`context/ModeContext.test.tsx`** (PR #1)
+1. Inside a provider → the mode starts as "learner".
+2. Calling `setMode("mentor")` inside `act` → the mode is "mentor".
+3. With `initialMode="mentor"` → it starts as "mentor".
+4. Outside a provider → rendering the hook throws "useMode must be used inside <ModeProvider>". Silence `console.error` with a spy for this test and restore it afterwards.
+
+**`ModeSwitch.test.tsx`** (PR #1) — render the switch inside a `ModeProvider` together with a tiny helper component that prints "Current mode: {mode}".
+1. By default → "Learner" has `aria-pressed="true"` and "Mentor" has `"false"`.
+2. Clicking "Mentor":
+   - The helper shows "Current mode: mentor".
+   - "Mentor" is pressed.
+   - Clicking "Learner" again shows "Current mode: learner".
+3. A group named "Switch mode" exists.
+
+**`app/dev/mentor/page.test.tsx`** — the **journey test**. Write it during PR #1 with the test marked as skipped (`it.skip`). Un-skip it in PR #2. It uses the **real** mock queue (no `vi.mock`). Before each test call `resetMockDoubts()`. Give each `findBy...` a `timeout` of about 3000ms, and the test itself about 15 seconds.
+1. Render the page.
+2. Type "How do I stop an infinite loop?" into "Ask a doubt", then click "Send doubt". Expect:
+   - "Doubt sent! A mentor will reply soon." appears.
+   - An "Open" badge appears.
+3. Click "Mentor". Expect a button "Open (1)".
+4. Type a reply into "Reply to: How do I stop an infinite loop?", then click "Send reply". Expect:
+   - A button "Answered (1)".
+   - A button "Open (0)".
+5. Click "Learner". Expect:
+   - "Test Mentor says:" appears.
+   - The reply text is shown.
+   - The "Answered" badge is shown.
+
+### Done when
+1. `npx vitest run` passes (the journey test is skipped in PR #1 and passing in PR #2). Type check and lint are clean.
+2. After PR #1: at http://localhost:3000/dev/mentor the switch flips the placeholder text and the active pill is teal.
+3. After PR #2, run the full journey by hand at `/dev/mentor`, then reload — the data is still there and the console has no red errors.
+
+### Definition of Done
+- [ ] `useMode` throws the exact error outside the provider; `ModeSwitch` uses `role="group"` + `aria-pressed`, brand tokens only
+- [ ] `/dev/mentor` shows `MyDoubts` / `MentorDashboard` by mode (PR #2)
+- [ ] Journey test written during PR #1 (skipped) and passing in PR #2
+- [ ] Handoff note drafted in PR #2
+- [ ] Both PR descriptions say "Mode switch is UI-only; a real mentor role check is still needed"
+
+---
+
+## TASK 13 — Learner Side: AskDoubtForm + MyDoubts
+
+**Owner:** ____________ **Branch:** `feature/step7-task13-learner-side`
+**Depends on:** Task 11's API (for the form) and `DoubtCard` (for the list) on `main`.
+**Blocks:** Task 12's PR #2. Post in the channel when merged.
+
+### Goal
+Build the learner's side: a form to ask a doubt (with validation, a sending state and clear messages) and a "My doubts" list showing each doubt's status and, once answered, the mentor's reply.
+
+### Files you use but don't edit
+- `@/types/doubt`: `Doubt` = `{ id, learnerName, question, status: "open" | "answered", createdAt (ISO string), reply?: { mentorName, text, repliedAt } }`.
+- `@/api/doubtApi`: `listDoubts(): Promise<Doubt[]>` and `createDoubt(question, learnerName): Promise<Doubt>`. Both throw on failure.
+- `@/api/mockDoubtApi`: `resetMockDoubts()` (dev page only).
+- `app/components/mentor-mode/DoubtCard.tsx`: `<DoubtCard doubt={d} />`. It renders an `<article>` with the question, an "Open"/"Answered" badge, and the reply if there is one.
+- Optional: `app/components/mascots/NovaBanner.tsx` — default export, props exactly `{ message: string; onDismiss: () => void }`.
+
+### Files to create
+```
+app/components/mentor-mode/AskDoubtForm.tsx
+app/components/mentor-mode/AskDoubtForm.test.tsx
+app/components/mentor-mode/MyDoubts.tsx
+app/components/mentor-mode/MyDoubts.test.tsx
+app/dev/learner-doubts-test/page.tsx
+```
+
+### What to build
+
+**1. `AskDoubtForm.tsx`** — `"use client"`, default export, props `{ onSent: () => void }`. Also export a constant `TEST_LEARNER_NAME = "Test Learner"` (used until login is wired in).
+1. A card (card look) containing a textarea labelled "Ask a doubt" (`htmlFor`/`id`), placeholder "What are you stuck on?", controlled, and disabled while sending.
+2. A `type="button"` teal button, "Send doubt", that shows "Sending..." and is disabled while sending.
+3. On click:
+   - If the trimmed question is shorter than **5** characters → show "Please describe your doubt in a few words." and do not call the API.
+   - Otherwise call `createDoubt(trimmedQuestion, TEST_LEARNER_NAME)`.
+4. **Double-click guard:** a `useRef(false)` "in flight" flag, checked first, set to true before the call, and reset in `finally`.
+5. Success:
+   - Clear the textarea.
+   - Show "Doubt sent! A mentor will reply soon."
+   - Call `onSent()`.
+6. Failure:
+   - Keep the text.
+   - Show "We could not send your doubt. Please try again."
+7. The message is rendered in a `<p role="status">`. Error messages also get a coral-bordered box.
+
+**2. `MyDoubts.tsx`** — `"use client"`, default export, no props. The whole learner view.
+1. State: `doubts` (array, starts empty), `loading` (starts true), `error` (string), `reloadKey` (number).
+2. Load with `listDoubts()` using the **reloadKey pattern** from the Project context. On success, store the doubts and clear the error. On failure, set the error to "We could not load your doubts. Please refresh the page.". In both cases, finish loading.
+3. Render, in order:
+   - The `AskDoubtForm`, whose `onSent` increments `reloadKey`.
+   - The heading "My doubts".
+   - While loading: "Loading your doubts...".
+   - On error: the error in a coral-bordered box.
+   - When loaded with no error and no doubts: "No doubts yet. Ask your first one above!".
+   - A `DoubtCard` for every doubt, **newest first** (sort by `createdAt`, descending).
+4. Optional (only after tests pass): if any doubt is answered, show `NovaBanner` with "A mentor replied to your doubt!" above the heading. If tests then fail on images, mock `next/image` in the test.
+
+**3. `app/dev/learner-doubts-test/page.tsx`** — a `"use client"` dev page with the heading "Learner Doubts Test", plus a "Clear all doubts" button. The button calls `resetMockDoubts()` and then remounts `MyDoubts` by changing its `key` (a counter in state).
+
+### Tests to write
+**`AskDoubtForm.test.tsx`** — mock `@/api/doubtApi` with `createDoubt` as a `vi.fn`; reset it before each test.
+1. Type "hey" and click "Send doubt" → you see the "Please describe your doubt…" message, and `createDoubt` is not called.
+2. Type "  How do I stop an infinite loop?  ", with `createDoubt` resolving, then click → you see "Doubt sent! A mentor will reply soon.", and:
+   - `createDoubt` was called with "How do I stop an infinite loop?" and "Test Learner".
+   - The textarea is empty.
+   - `onSent` was called once.
+3. `createDoubt` rejects → you see "We could not send your doubt. Please try again.", the text is kept, and `onSent` is not called.
+4. `createDoubt` never resolves; click "Send doubt", then try clicking again → the button reads "Sending..." and is disabled, and `createDoubt` was called once.
+
+**`MyDoubts.test.tsx`** — mock `@/api/doubtApi` with `listDoubts` and `createDoubt` as `vi.fn`s.
+1. `listDoubts` resolves `[]` → "No doubts yet. Ask your first one above!".
+2. An older answered doubt and a newer open doubt → the first `article` contains the newer question, the second the older one, and the reply text is shown.
+3. `listDoubts` rejects → "We could not load your doubts. Please refresh the page.".
+4. `listDoubts` resolves `[]` first and then `[newDoubt]`; `createDoubt` resolves → after typing the question and clicking "Send doubt", an `article` with the new question appears, and `listDoubts` was called twice.
+
+### Done when
+1. `npx vitest run`: your 2 test files pass. Type check and lint are clean.
+2. At http://localhost:3000/dev/learner-doubts-test:
+   1. Clear all → you see the empty message.
+   2. "hey" → you see the validation message.
+   3. A real question → Sending..., then "Doubt sent!", the box clears, and a cream **Open** card appears at the top.
+   4. A fast double-click → only one new card.
+   5. A very long question → it wraps.
+   6. Set `MOCK_FORCE_ERROR = true` locally → you see the friendly load and send errors. Set it back and don't commit it.
+   7. It is usable at 375px wide.
+
+### Definition of Done
+- [ ] Questions under 5 characters are blocked with the friendly message; Sending... state; the box clears only on success
+- [ ] Double-click sends one doubt
+- [ ] "My doubts" is newest first, with friendly loading / empty / error states; answered doubts show the reply
+- [ ] Data loading uses the reloadKey pattern (lint passes)
+- [ ] 2 test files pass; type check and lint clean
+- [ ] `/dev/learner-doubts-test` kept
+
+---
+
+## TASK 14 — Mentor Side: MentorDashboard + ReplyForm
+
+**Owner:** ____________ **Branch:** `feature/step7-task14-mentor-side`
+**Depends on:** Task 11's API and `DoubtCard` on `main` (you can build `ReplyForm` before that — it imports nothing).
+**Blocks:** Task 12's PR #2. Post in the channel when merged.
+
+### Goal
+Build the mentor's side:
+- A dashboard with **Open** and **Answered** tabs, each with a count.
+- Open doubts listed oldest first, so whoever waited longest is helped first.
+- A reply box under each open doubt.
+- Friendly messages whenever something fails.
+
+### Files you use but don't edit
+- `@/types/doubt`: `Doubt` = `{ id, learnerName, question, status: "open" | "answered", createdAt (ISO string), reply?: { mentorName, text, repliedAt } }`, and `DoubtStatus` = `"open" | "answered"`.
+- `@/api/doubtApi`: `listDoubts(): Promise<Doubt[]>`, `createDoubt(question, learnerName): Promise<Doubt>` (dev page only), `replyToDoubt(id, text, mentorName): Promise<Doubt>`. All throw on failure.
+- `@/api/mockDoubtApi`: `resetMockDoubts()` (dev page only).
+- `app/components/mentor-mode/DoubtCard.tsx`: `<DoubtCard doubt={d} />`. It renders an `<article>` with the question, an "Open"/"Answered" badge, and "{mentorName} says:" plus the reply when answered.
+
+### Files to create
+```
+app/components/mentor-mode/ReplyForm.tsx
+app/components/mentor-mode/ReplyForm.test.tsx
+app/components/mentor-mode/MentorDashboard.tsx
+app/components/mentor-mode/MentorDashboard.test.tsx
+app/dev/mentor-dashboard-test/page.tsx
+```
+
+### What to build
+
+**1. `ReplyForm.tsx`** — `"use client"`, default export, props `{ replyTo: string; onSend: (text: string) => Promise<void> }`. It knows nothing about the API; the parent decides what `onSend` does, and `onSend` throws on failure.
+1. A text `<input>` with `aria-label` exactly "Reply to: {replyTo}", placeholder "Write a reply...", controlled, and disabled while sending.
+2. A `type="button"` teal button, "Send reply". It shows "Sending..." while sending, and is disabled while sending or when the text is empty or only spaces.
+3. On click:
+   - Ignore it if the text is blank or a send is already in flight. Use a `useRef(false)` guard: set it before the call and reset it in `finally`.
+   - Otherwise call `onSend(trimmedText)`.
+   - On success, clear the input.
+   - On failure, keep the text and show "We could not send your reply. Please try again." in a coral-bordered box.
+4. Layout: the input and button are stacked on phones and side by side from the `sm` breakpoint up.
+
+**2. `MentorDashboard.tsx`** — `"use client"`, default export, no props. The whole mentor view. Also export a constant `TEST_MENTOR_NAME = "Test Mentor"`.
+1. State: `doubts`, `loading` (starts true), `error`, `tab` (`DoubtStatus`, starts `"open"`), `reloadKey`.
+2. Load with `listDoubts()` using the **reloadKey pattern** from the Project context. On failure, the error is "We could not load the doubts. Please refresh the page.".
+3. While loading, render only "Loading doubts...". On error, render only the error, in a coral-bordered box.
+4. Otherwise render:
+   - A `role="group"` with `aria-label="Filter doubts"` containing two `type="button"` tab buttons, labelled exactly "Open ({count})" and "Answered ({count})". Each count is the number of doubts with that status.
+   - Each tab button has `aria-pressed` set when it's the active tab. The active tab is `bg-tealpop`, the other white; both are rounded pills with an ink border.
+   - The doubts of the active tab, **oldest first** (sort by `createdAt`, ascending). Each doubt is a `DoubtCard`, and an open doubt also gets a `ReplyForm` underneath with `replyTo` set to the question.
+   - If the active tab has no doubts: "Nothing here yet.".
+5. Sending a reply means: call `replyToDoubt(id, text, TEST_MENTOR_NAME)`, then increment `reloadKey`. Let errors propagate, so the `ReplyForm` shows its own message.
+
+**3. `app/dev/mentor-dashboard-test/page.tsx`** — a `"use client"` dev page with the heading "Mentor Dashboard Test" and two buttons:
+- **"Add sample doubt":** creates a doubt with a random question from a short list of sample questions and the learner name "Sample Learner". It shows "Adding..." while working.
+- **"Clear all doubts":** calls `resetMockDoubts()`.
+
+After either button, remount `MentorDashboard` by changing its `key` (a counter in state).
+
+### Tests to write
+**`ReplyForm.test.tsx`**
+1. Initially, "Send reply" is disabled. Typing only spaces → it's still disabled.
+2. Type "  A named box for a value.  " and click, with `onSend` resolving → `onSend` was called with "A named box for a value." and the input is empty.
+3. `onSend` rejects → you see "We could not send your reply. Please try again." and the text is kept.
+4. `onSend` never resolves; click, then try clicking again → the button reads "Sending..." and is disabled, and `onSend` was called once.
+
+**`MentorDashboard.test.tsx`** — mock `@/api/doubtApi` with `listDoubts` and `replyToDoubt` as `vi.fn`s. Build test doubts with fixed `createdAt` values.
+1. Two open doubts (one newer, one older) plus one answered doubt:
+   - "Open (2)" is pressed and "Answered (1)" exists.
+   - The first `article` is the older question and the second is the newer one.
+2. Click "Answered (1)" → you see the answered reply text, and there is no textbox.
+3. `listDoubts` resolves `[openDoubt]` first and then `[thatDoubtAnswered]`; `replyToDoubt` resolves. Type into "Reply to: {question}" and click "Send reply". Expect:
+   - `replyToDoubt` was called with the doubt's id, the text and "Test Mentor".
+   - "Answered (1)" and "Open (0)" appear.
+   - "Nothing here yet." is shown.
+4. `listDoubts` resolves `[]` → "Nothing here yet.".
+5. `listDoubts` rejects → "We could not load the doubts. Please refresh the page.".
+6. `replyToDoubt` rejects → after sending, "We could not send your reply. Please try again." is shown.
+
+### Done when
+1. `npx vitest run`: your 2 test files pass. Type check and lint are clean.
+2. At http://localhost:3000/dev/mentor-dashboard-test:
+   1. Clear all → you see "Open (0)", "Answered (0)" and "Nothing here yet.".
+   2. Add 3 sample doubts → "Open (3)", oldest at the top.
+   3. Reply to the middle one → it moves, and the tabs show "Open (2)" and "Answered (1)".
+   4. The Answered tab shows "Test Mentor says:" and no reply box.
+   5. Set `MOCK_FORCE_ERROR = true` locally → you see the friendly load error, not a blank page. Set it back and don't commit it.
+   6. At 375px wide, the reply box and button stack and stay usable.
+
+### Definition of Done
+- [ ] Tab counts are correct; the active tab is teal with `aria-pressed`; open doubts are oldest first
+- [ ] Each open doubt has its own reply box; a reply moves it to Answered and is sent as "Test Mentor"
+- [ ] Friendly loading, empty, load-error and reply-error states; never a blank screen
+- [ ] A double-click sends one reply; data loading uses the reloadKey pattern (lint passes)
+- [ ] 2 test files pass; type check and lint clean
+- [ ] `/dev/mentor-dashboard-test` kept
+
+---
+
+## FINAL — Step 7 Team Check (Tasks 11–14 together)
+
+Done **together** once Tasks 11–14 (and Task 12's PR #2) are merged. It is not one person's job.
+1. Everyone pulls `main` and runs `npm install`.
+2. `npx vitest run` → all 10 Step 7 test files pass, along with everything else. `npx tsc --noEmit` and `npm run lint` are clean.
+3. Each owner opens their own dev page and confirms it still works:
+   - `/dev/doubt-card-test`
+   - `/dev/mentor`
+   - `/dev/learner-doubts-test`
+   - `/dev/mentor-dashboard-test`
+4. Together, at `/dev/mentor`:
+   1. Delete `setuai_mock_doubts` in DevTools → Application → Local Storage.
+   2. Run the full journey: learner asks → mentor replies → learner sees the reply.
+   3. Reload and check the data is still there.
+   4. Check at 375px wide.
+   5. Make sure there are no red console errors.
+5. If anything is broken, the file's owner fixes it on a new branch **with a test that would have caught it**.
+6. Post the handoff note drafted in Task 12's PR #2 in the team channel.
+
+**Later, when the backend is ready:**
+1. Set `NEXT_PUBLIC_API_URL` in your local `.env`.
+2. Flip `USE_MOCK` to `false` in `api/doubtApi.ts`.
+3. Replace "Test Learner" and "Test Mentor" with the logged-in user.
+4. Add a real role check before showing the Mentor option.
+5. If field names differ, update `types/doubt.ts` first and fix what TypeScript underlines.

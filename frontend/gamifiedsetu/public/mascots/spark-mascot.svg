@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Spark mascot base">
+  <title>Spark - base</title>
+  <!-- Approved base: #85CEC7 / #6E6D6C / #303030 / #DC6F51 + #FFD93D yellow bulb. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M58 52 L66 60" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M142 52 L134 60" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M48 88 L60 90" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M152 88 L140 90" stroke="#DC6F51" stroke-width="5"/>
+    <path d="M100 18 L100 30" stroke="#DC6F51" stroke-width="5"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M68 116 L56 128" stroke="#303030" stroke-width="11" stroke-linecap="round"/>
+    <path d="M68 116 L56 128" stroke="#6E6D6C" stroke-width="5" stroke-linecap="round"/>
+    <path d="M132 116 L144 128" stroke="#303030" stroke-width="11" stroke-linecap="round"/>
+    <path d="M132 116 L144 128" stroke="#6E6D6C" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="55" cy="130" r="6.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <circle cx="145" cy="130" r="6.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <ellipse cx="88" cy="168" rx="10" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="112" cy="168" rx="10" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <circle cx="100" cy="78" r="36" fill="#FFD93D" stroke="#303030" stroke-width="5"/>
+    <path d="M90 92 L90 102 L96 108 L104 108 L110 102 L110 92" fill="none" stroke="#6E6D6C" stroke-width="2.5"/>
+    <path d="M90 96 H110" stroke="#6E6D6C" stroke-width="2"/>
+    <rect x="84" y="110" width="32" height="28" rx="7" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <path d="M84 118 H116 M84 126 H116 M84 134 H116" stroke="#303030" stroke-width="2.5"/>
+    <ellipse cx="100" cy="142" rx="8" ry="6" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <path d="M76 64 Q80 54 90 50" fill="none" stroke="#303030" stroke-width="2.5" opacity="0.35"/>
+  </g>
+  <g id="eyes" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="88" cy="76" rx="8" ry="10.5" fill="#303030"/>
+    <ellipse cx="112" cy="76" rx="8" ry="10.5" fill="#303030"/>
+    <circle cx="90.5" cy="72.5" r="2.8" fill="#85CEC7"/>
+    <circle cx="114.5" cy="72.5" r="2.8" fill="#85CEC7"/>
+    <path d="M80 62 Q88 60 95 62" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <path d="M105 62 Q112 60 120 62" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <ellipse cx="78" cy="86" rx="4" ry="2.8" fill="#85CEC7" stroke="#303030" stroke-width="1.5"/>
+    <ellipse cx="122" cy="86" rx="4" ry="2.8" fill="#85CEC7" stroke="#303030" stroke-width="1.5"/>
+    <path d="M90 90 Q100 97 110 90" fill="none" stroke="#303030" stroke-width="2.5"/>
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">SPARK</text>
+</svg>

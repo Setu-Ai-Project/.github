@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Bug dismissed - eyes closed low energy">
+  <title>Bug - dismissed</title>
+  <!-- Same base shapes/colors, drooped arms + closed eyes + flat mouth. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M88 50 L82 34" fill="none" stroke="#303030" stroke-width="5"/>
+    <path d="M112 50 L118 34" fill="none" stroke="#303030" stroke-width="5"/>
+    <circle cx="81" cy="32" r="5.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+    <circle cx="119" cy="32" r="5.5" fill="#DC6F51" stroke="#303030" stroke-width="3.5"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="82" cy="170" rx="11" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="118" cy="170" rx="11" ry="6.5" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="100" cy="124" rx="40" ry="38" fill="#DC6F51" stroke="#303030" stroke-width="5"/>
+    <path d="M100 90 L100 158" stroke="#303030" stroke-width="2.5"/>
+    <circle cx="82" cy="114" r="7" fill="#303030"/>
+    <circle cx="118" cy="114" r="7" fill="#303030"/>
+    <circle cx="84" cy="138" r="5.5" fill="#303030"/>
+    <circle cx="116" cy="138" r="5.5" fill="#303030"/>
+    <path d="M66 128 L76 142" stroke="#303030" stroke-width="10" stroke-linecap="round"/>
+    <path d="M134 128 L124 142" stroke="#303030" stroke-width="10" stroke-linecap="round"/>
+    <rect x="76" y="122" width="48" height="42" rx="7" fill="#85CEC7" stroke="#303030" stroke-width="4"/>
+    <rect x="93" y="118" width="14" height="8" rx="3" fill="#6E6D6C" stroke="#303030" stroke-width="2.5"/>
+    <rect x="82" y="131" width="7" height="7" rx="2" fill="none" stroke="#303030" stroke-width="2"/>
+    <path d="M83 134.5 L85.5 137 L89.5 132.5" fill="none" stroke="#303030" stroke-width="1.8"/>
+    <path d="M93 135 H116" stroke="#303030" stroke-width="1.8"/>
+    <rect x="82" y="141" width="7" height="7" rx="2" fill="none" stroke="#303030" stroke-width="2"/>
+    <path d="M93 145 H112" stroke="#6E6D6C" stroke-width="1.8"/>
+    <rect x="82" y="151" width="7" height="7" rx="2" fill="none" stroke="#303030" stroke-width="2"/>
+    <path d="M93 155 H112" stroke="#6E6D6C" stroke-width="1.8"/>
+    <circle cx="77" cy="143" r="7" fill="#303030" stroke="#303030" stroke-width="3"/>
+    <circle cx="123" cy="143" r="7" fill="#303030" stroke="#303030" stroke-width="3"/>
+    <circle cx="100" cy="68" r="24" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <path d="M94 93 H106" fill="none" stroke="#DC6F51" stroke-width="2.5"/>
+    <ellipse cx="76" cy="84" rx="4" ry="2.8" fill="#DC6F51" stroke="#303030" stroke-width="1.5"/>
+    <ellipse cx="124" cy="84" rx="4" ry="2.8" fill="#DC6F51" stroke="#303030" stroke-width="1.5"/>
+  </g>
+  <g id="eyes" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="88" cy="68" r="14" fill="#85CEC7" stroke="#3A8A83" stroke-width="4"/>
+    <circle cx="112" cy="68" r="14" fill="#85CEC7" stroke="#3A8A83" stroke-width="4"/>
+    <path d="M102 68 H98" stroke="#3A8A83" stroke-width="4"/>
+    <path d="M81 68 Q88 71 95 68" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <path d="M105 68 Q112 71 119 68" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <path d="M79 54 Q88 52 96 53" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <path d="M104 53 Q112 52 121 54" fill="none" stroke="#303030" stroke-width="2.5"/>
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">BUG</text>
+</svg>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Byte celebrating - arms up big pixel smile sparkles">
+  <title>Byte - celebrating</title>
+  <!-- Same base shapes/colors, both arms raised + wider smile + sparkles. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="100" y1="38" x2="100" y2="24" stroke="#303030" stroke-width="5"/>
+    <circle cx="100" cy="20" r="6" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="64" y="62" width="12" height="16" rx="6" fill="#DC6F51" stroke="#303030" stroke-width="4.5"/>
+    <rect x="124" y="62" width="12" height="16" rx="6" fill="#DC6F51" stroke="#303030" stroke-width="4.5"/>
+    <polygon points="36,42 38.5,48 45,50.5 38.5,53 36,59 33.5,53 27,50.5 33.5,48" fill="#FFD93D" stroke="#303030" stroke-width="2"/>
+    <polygon points="164,42 166.5,48 173,50.5 166.5,53 164,59 161.5,53 155,50.5 161.5,48" fill="#FFD93D" stroke="#303030" stroke-width="2"/>
+    <polygon points="170,96 171.5,100 176,101.5 171.5,103 170,107 168.5,103 164,101.5 168.5,100" fill="#85CEC7" stroke="#303030" stroke-width="2"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="84" y="146" width="13" height="22" rx="6.5" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <rect x="103" y="146" width="13" height="22" rx="6.5" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <ellipse cx="90.5" cy="170" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="109.5" cy="170" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <path d="M74 112 L51 88" fill="none" stroke="#303030" stroke-width="22"/>
+    <path d="M74 112 L51 88" fill="none" stroke="#6E6D6C" stroke-width="13"/>
+    <circle cx="49" cy="85" r="8.5" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <path d="M126 112 L149 88" fill="none" stroke="#303030" stroke-width="22"/>
+    <path d="M126 112 L149 88" fill="none" stroke="#6E6D6C" stroke-width="13"/>
+    <circle cx="151" cy="85" r="8.5" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="72" y="100" width="56" height="52" rx="16" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <rect x="82" y="108" width="36" height="36" rx="10" fill="#303030" stroke="#303030" stroke-width="2.5"/>
+    <polygon points="103,112 90,128 97,128 94,140 108,124 101,124" fill="#85CEC7" stroke="#303030" stroke-width="2.5"/>
+    <rect x="93" y="88" width="14" height="18" rx="5" fill="#6E6D6C" stroke="#303030" stroke-width="4"/>
+    <circle cx="100" cy="66" r="28" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <rect x="78" y="50" width="44" height="34" rx="10" fill="#303030" stroke="#303030" stroke-width="3"/>
+  </g>
+  <g id="eyes" stroke-linecap="square" stroke-linejoin="round">
+    <rect x="85" y="59" width="12" height="12" fill="#FFD93D"/>
+    <rect x="103" y="59" width="12" height="12" fill="#FFD93D"/>
+    <rect x="88" y="74" width="8" height="4" fill="#FFD93D"/>
+    <rect x="96" y="77" width="8" height="4" fill="#FFD93D"/>
+    <rect x="104" y="74" width="8" height="4" fill="#FFD93D"/>
+    <rect x="96" y="73" width="8" height="4" fill="#FFD93D"/>
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">BYTE</text>
+</svg>

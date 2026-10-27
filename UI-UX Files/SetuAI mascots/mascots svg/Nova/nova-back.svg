@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Nova back view">
+  <title>Nova - back</title>
+  <!-- Same colors/outline as base, rear view: full hair, no face, no chest bolt. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="59" cy="82" r="13" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <circle cx="141" cy="82" r="13" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <circle cx="70" cy="79" r="5.5" fill="#85CEC7" stroke="#303030" stroke-width="3"/>
+    <circle cx="130" cy="79" r="5.5" fill="#85CEC7" stroke="#303030" stroke-width="3"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="82" y="143" width="14" height="26" rx="7" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <rect x="104" y="143" width="14" height="26" rx="7" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <ellipse cx="89" cy="171" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="111" cy="171" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <rect x="57" y="108" width="18" height="30" rx="9" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <circle cx="66" cy="140" r="8" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="125" y="108" width="18" height="30" rx="9" fill="#6E6D6C" stroke="#303030" stroke-width="5"/>
+    <circle cx="134" cy="140" r="8" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="73" y="102" width="54" height="48" rx="18" fill="#85CEC7" stroke="#303030" stroke-width="5"/>
+    <path d="M100 102 L100 130" stroke="#303030" stroke-width="2.5"/>
+    <rect x="80" y="116" width="5" height="16" rx="2.5" fill="#303030" stroke="#303030" stroke-width="2"/>
+    <circle cx="82.5" cy="115" r="4.5" fill="none" stroke="#303030" stroke-width="3"/>
+    <rect x="116" y="116" width="5" height="16" rx="2.5" fill="#303030" stroke="#303030" stroke-width="2"/>
+    <circle cx="118.5" cy="114" r="3.5" fill="#DC6F51" stroke="#303030" stroke-width="2"/>
+    <rect x="70" y="130" width="60" height="18" rx="9" fill="#5A3A2A" stroke="#303030" stroke-width="5"/>
+    <rect x="76" y="133" width="12" height="12" rx="3" fill="#C9A47A" stroke="#303030" stroke-width="2.5"/>
+    <rect x="112" y="133" width="12" height="12" rx="3" fill="#C9A47A" stroke="#303030" stroke-width="2.5"/>
+    <rect x="92" y="132" width="16" height="14" rx="4" fill="#C9A47A" stroke="#303030" stroke-width="2.5"/>
+    <rect x="92" y="86" width="16" height="24" rx="6" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <circle cx="100" cy="66" r="30" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <path d="M100 40 L100 92" stroke="#6E6D6C" stroke-width="2.5"/>
+    <path d="M78 56 Q84 48 94 44" fill="none" stroke="#6E6D6C" stroke-width="2"/>
+  </g>
+  <g id="eyes">
+    <!-- rear view: no visible face -->
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">NOVA</text>
+</svg>

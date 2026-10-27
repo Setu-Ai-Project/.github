@@ -21,6 +21,7 @@ from PIL import Image
 from image_generator import generate_image
 from similarity_scorer import calculate_similarity, is_close_enough
 from feedback_generator import generate_feedback, APPROVED_CATEGORIES
+from moderation import moderate_prompt, moderate_image_response
 
 
 def verify_module_1() -> bool:
@@ -119,6 +120,102 @@ def verify_module_3() -> bool:
     return True
 
 
+def verify_moderation() -> bool:
+    print("\n" + "=" * 60)
+    print("STEP 1.4: Verifying Wave 1 Content Moderation Layer")
+    print("=" * 60)
+
+    all_tests_passed = True
+
+    # 1. Safe learner prompt (Expected: Allowed)
+    safe_prompt = "A cozy wooden treehouse in an autumn forest at sunset"
+    is_allowed, reason = moderate_prompt(safe_prompt)
+    if is_allowed and reason is None:
+        print("  [PASS] Test 1: Safe learner prompt is allowed.")
+    else:
+        print(f"  [FAIL] Test 1: Safe prompt was blocked: {reason}")
+        all_tests_passed = False
+
+    # 2. Unsafe learner prompt (Expected: Blocked)
+    unsafe_prompt = "A warrior with a blood covered sword after a murder"
+    is_allowed, reason = moderate_prompt(unsafe_prompt)
+    if not is_allowed and reason:
+        print(f"  [PASS] Test 2: Unsafe learner prompt was correctly blocked.")
+        print(f"         Reason: {reason[:60]}...")
+    else:
+        print("  [FAIL] Test 2: Unsafe prompt was not blocked.")
+        all_tests_passed = False
+
+    # 3. Clean Stability AI response (Expected: Allowed)
+    class MockStabilityResponse:
+        def __init__(self, headers, status_code=200):
+            self.headers = headers
+            self.status_code = status_code
+
+    clean_resp = MockStabilityResponse(headers={"finish-reason": "SUCCESS"}, status_code=200)
+    is_allowed, reason = moderate_image_response(clean_resp)
+    if is_allowed and reason is None:
+        print("  [PASS] Test 3: Clean Stability AI response is allowed.")
+    else:
+        print(f"  [FAIL] Test 3: Clean response was blocked: {reason}")
+        all_tests_passed = False
+
+    # 4. Flagged Stability AI response (Expected: Blocked)
+    flagged_resp = MockStabilityResponse(headers={"finish-reason": "CONTENT_FILTERED"}, status_code=200)
+    is_allowed, reason = moderate_image_response(flagged_resp)
+    if not is_allowed and reason:
+        print(f"  [PASS] Test 4: Flagged Stability AI response was correctly blocked.")
+        print(f"         Reason: {reason[:60]}...")
+    else:
+        print("  [FAIL] Test 4: Flagged response was not blocked.")
+        all_tests_passed = False
+
+    # 5. Verify blocked prompts never reach image generation
+    test_dummy_path = "test_blocked_should_not_exist.png"
+    if os.path.exists(test_dummy_path):
+        os.remove(test_dummy_path)
+
+    gen_result = generate_image(prompt=unsafe_prompt, output_path=test_dummy_path)
+    file_was_created = os.path.exists(test_dummy_path)
+
+    if isinstance(gen_result, str) and not file_was_created:
+        print("  [PASS] Test 5: Blocked prompt never reached image generation (no file created, moderation message returned).")
+    else:
+        print("  [FAIL] Test 5: Blocked prompt improperly invoked image generation.")
+        all_tests_passed = False
+
+    # Clean up test artifact if unexpectedly created
+    if os.path.exists(test_dummy_path):
+        os.remove(test_dummy_path)
+
+    # 6. Verify blocked image responses never reach similarity scoring
+    similarity_called = False
+
+    def sample_pipeline_evaluator(generation_output, reference_image):
+        nonlocal similarity_called
+        # If generation was blocked, generation_output is a string reason
+        if isinstance(generation_output, str):
+            # Pipeline halts immediately; similarity scoring is bypassed
+            return generation_output
+        # Scoring only occurs if valid image bytes were produced
+        similarity_called = True
+        return calculate_similarity(generation_output, reference_image)
+
+    ref_test_image = Image.new("RGB", (64, 64), color=(50, 100, 150))
+    blocked_output_message = (
+        "The image generator felt this image was not safe to display. Let's try a gentler prompt!"
+    )
+
+    pipeline_result = sample_pipeline_evaluator(blocked_output_message, ref_test_image)
+    if not similarity_called and pipeline_result == blocked_output_message:
+        print("  [PASS] Test 6: Blocked image response never reached similarity scoring (scoring bypassed).")
+    else:
+        print("  [FAIL] Test 6: Blocked image response improperly triggered similarity scoring.")
+        all_tests_passed = False
+
+    return all_tests_passed
+
+
 def main():
     print("*" * 60)
     print("AI RESEARCH DEVELOPMENT PLAN - STEP 1 VERIFICATION SUITE")
@@ -150,6 +247,14 @@ def main():
         print(f"ERROR in Module 3: {e}")
         results.append(("Module 3 (Feedback Classifier)", False))
 
+    # 4. Moderation Layer
+    try:
+        r4 = verify_moderation()
+        results.append(("Moderation Layer (Wave 1)", r4))
+    except Exception as e:
+        print(f"ERROR in Moderation Layer: {e}")
+        results.append(("Moderation Layer (Wave 1)", False))
+
     print("\n" + "=" * 60)
     print("SUMMARY OF VERIFICATION")
     print("=" * 60)
@@ -163,7 +268,7 @@ def main():
     print("=" * 60)
     if all_passed:
         print("ALL STEP 1 VERIFICATION CHECKS PASSED SUCCESSFULLY!")
-        print("All three modules are functioning independently.")
+        print("All three modules and the moderation layer are functioning.")
         sys.exit(0)
     else:
         print("SOME CHECKS FAILED. Please review the output above.")

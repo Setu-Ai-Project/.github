@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Nova celebrating - arms up big smile sparkles">
+  <title>Nova - celebrating</title>
+  <!-- Same base shapes/colors, both arms raised + open smile + sparkles. No gradients. -->
+  <g id="outline" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="100" cy="62" rx="38" ry="32" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <circle cx="59" cy="82" r="13" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <circle cx="141" cy="82" r="13" fill="#303030" stroke="#303030" stroke-width="5"/>
+    <circle cx="70" cy="79" r="5.5" fill="#85CEC7" stroke="#303030" stroke-width="3"/>
+    <circle cx="130" cy="79" r="5.5" fill="#85CEC7" stroke="#303030" stroke-width="3"/>
+    <polygon points="36,46 38.5,52 45,54.5 38.5,57 36,63 33.5,57 27,54.5 33.5,52" fill="#FFD93D" stroke="#303030" stroke-width="2"/>
+    <polygon points="164,46 166.5,52 173,54.5 166.5,57 164,63 161.5,57 155,54.5 161.5,52" fill="#FFD93D" stroke="#303030" stroke-width="2"/>
+    <polygon points="168,100 169.5,104 174,105.5 169.5,107 168,111 166.5,107 162,105.5 166.5,104" fill="#85CEC7" stroke="#303030" stroke-width="2"/>
+  </g>
+  <g id="body" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="82" y="143" width="14" height="26" rx="7" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <rect x="104" y="143" width="14" height="26" rx="7" fill="#6E6D6C" stroke="#303030" stroke-width="4.5"/>
+    <ellipse cx="89" cy="171" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <ellipse cx="111" cy="171" rx="11" ry="7" fill="#303030" stroke="#303030" stroke-width="4"/>
+    <path d="M74 112 L51 86" fill="none" stroke="#303030" stroke-width="22"/>
+    <path d="M74 112 L51 86" fill="none" stroke="#6E6D6C" stroke-width="13"/>
+    <circle cx="49" cy="83" r="8.5" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <path d="M126 112 L149 86" fill="none" stroke="#303030" stroke-width="22"/>
+    <path d="M126 112 L149 86" fill="none" stroke="#6E6D6C" stroke-width="13"/>
+    <circle cx="151" cy="83" r="8.5" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <rect x="73" y="102" width="54" height="48" rx="18" fill="#85CEC7" stroke="#303030" stroke-width="5"/>
+    <rect x="80" y="116" width="5" height="16" rx="2.5" fill="#303030" stroke="#303030" stroke-width="2"/>
+    <circle cx="82.5" cy="115" r="4.5" fill="none" stroke="#303030" stroke-width="3"/>
+    <rect x="116" y="116" width="5" height="16" rx="2.5" fill="#303030" stroke="#303030" stroke-width="2"/>
+    <circle cx="118.5" cy="114" r="3.5" fill="#DC6F51" stroke="#303030" stroke-width="2"/>
+    <rect x="70" y="130" width="60" height="18" rx="9" fill="#5A3A2A" stroke="#303030" stroke-width="5"/>
+    <rect x="76" y="133" width="12" height="12" rx="3" fill="#C9A47A" stroke="#303030" stroke-width="2.5"/>
+    <rect x="112" y="133" width="12" height="12" rx="3" fill="#C9A47A" stroke="#303030" stroke-width="2.5"/>
+    <rect x="92" y="132" width="16" height="14" rx="4" fill="#C9A47A" stroke="#303030" stroke-width="2.5"/>
+    <polygon points="102,109 88,130 96,130 94,142 108,124 100,124" fill="#FFD93D" stroke="#303030" stroke-width="2.5"/>
+    <rect x="92" y="86" width="16" height="24" rx="6" fill="#DC6F51" stroke="#303030" stroke-width="4"/>
+    <circle cx="100" cy="68" r="28" fill="#DC6F51" stroke="#303030" stroke-width="5"/>
+    <path d="M74 62 Q76 38 100 38 Q124 38 126 62 Q118 52 112 60 Q106 48 99 58 Q92 48 87 59 Q81 52 74 62 Z" fill="#303030" stroke="#303030" stroke-width="2.5"/>
+  </g>
+  <g id="eyes" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="88" cy="69" rx="9" ry="11.5" fill="#303030"/>
+    <ellipse cx="112" cy="69" rx="9" ry="11.5" fill="#303030"/>
+    <circle cx="91" cy="65.5" r="3.2" fill="#85CEC7"/>
+    <circle cx="115" cy="65.5" r="3.2" fill="#85CEC7"/>
+    <path d="M80 53 Q88 49 96 53" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <path d="M104 53 Q112 49 120 53" fill="none" stroke="#303030" stroke-width="2.5"/>
+    <ellipse cx="80" cy="82" rx="4.5" ry="3" fill="#85CEC7" stroke="#303030" stroke-width="1.5"/>
+    <ellipse cx="120" cy="82" rx="4.5" ry="3" fill="#85CEC7" stroke="#303030" stroke-width="1.5"/>
+    <circle cx="100" cy="79" r="2.2" fill="#303030"/>
+    <path d="M87 83 Q100 101 113 83 Q100 89 87 83 Z" fill="#303030" stroke="#303030" stroke-width="2.5"/>
+    <ellipse cx="100" cy="92" rx="5" ry="2.8" fill="#DC6F51"/>
+  </g>
+  <text x="100" y="194" text-anchor="middle" font-family="Verdana, Arial, sans-serif" font-size="15" font-weight="bold" letter-spacing="3" fill="#303030">NOVA</text>
+</svg>
