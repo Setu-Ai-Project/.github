@@ -15,6 +15,7 @@ from models.completed_challenge import CompletedChallenge  # noqa: F401 - regist
 from models.badge import Badge  # noqa: F401 - registers table with SQLModel metadata
 from models.user_badge import UserBadge  # noqa: F401 - registers table with SQLModel metadata
 from models.certificate import Certificate  # noqa: F401 - registers table with SQLModel metadata
+from models.submission import Submission  # noqa: F401 - registers table with SQLModel metadata
 from routes import (
     user_router,
     module_router,
