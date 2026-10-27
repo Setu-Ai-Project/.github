@@ -1,6 +1,8 @@
 """Tests for POST and GET /submissions endpoints (Step 6 Contract)."""
 
+# pyrefly: ignore[missing-import]
 import pytest
+# pyrefly: ignore[missing-import]
 from sqlmodel import Session
 
 from main import app
@@ -127,3 +129,25 @@ def test_submission_passes_and_awards_xp(client, session: Session):
         assert submissions[0]["submission_id"] == data["submission_id"]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_submission_unsafe_content_blocked(client, session: Session):
+    user = _create_user(session, clerk_id="clerk_unsafe_user")
+    challenge = _seed_challenge(session)
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        response = client.post(
+            "/submissions",
+            json={
+                "challenge_id": challenge.id,
+                "answer_text": "I will murder everyone with a gun",
+            },
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "needs_revision"
+        assert data["xp_awarded"] == 0
+        assert any("safe" in msg.lower() or "friendly" in msg.lower() for msg in data["feedback"])
+    finally:
+        app.dependency_overrides.clear()
+

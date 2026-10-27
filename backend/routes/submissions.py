@@ -16,6 +16,7 @@ from models.submission import (
 )
 from models.user import User
 from realtime.notify import notify_progress
+from services.ai_moderation import check_learner_text_safety
 from services.progression import award_xp
 from services.verifier import verify_answer
 
@@ -67,8 +68,24 @@ def create_submission(
     ).all()
     attempt_number = len(prev_count) + 1
 
-    # 3. Verify answer
-    # If challenge has specific verification rules in future, use them; default minimum requirements
+    # 2.5 AI Research Safety Moderation check
+    is_safe, safety_feedback = check_learner_text_safety(payload.answer_text)
+    if not is_safe:
+        submission = Submission(
+            user_id=current_user.id,
+            challenge_id=payload.challenge_id,
+            answer_text=payload.answer_text,
+            status="needs_revision",
+            xp_awarded=0,
+            attempt_number=attempt_number,
+        )
+        submission.feedback = [safety_feedback or "Let's keep our submissions friendly, safe, and creative!"]
+        session.add(submission)
+        session.commit()
+        session.refresh(submission)
+        return _to_response(submission)
+
+    # 3. Verify answer against pedagogical challenge rules
     rules = {"min_words": 5}
     verification = verify_answer(payload.answer_text, rules)
 
@@ -136,3 +153,14 @@ def list_submissions(
 
     results = session.exec(stmt).all()
     return [_to_response(sub) for sub in results]
+
+
+@router.post("/moderate")
+def moderate_learner_input(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Real-time endpoint for frontend to check prompt text safety before submitting."""
+    text = payload.get("text", "")
+    is_safe, reason = check_learner_text_safety(text)
+    return {"is_safe": is_safe, "reason": reason}
