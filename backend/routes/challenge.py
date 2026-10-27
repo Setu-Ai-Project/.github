@@ -5,6 +5,7 @@ to skip challenges; completion should come only from validated submissions
 (Pair B2's POST /submissions with status passed).
 """
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
 try:
@@ -14,6 +15,7 @@ try:
         ChallengeCompletionResponse,
     )
     from models.user import User
+    from realtime.notify import notify_progress
     from services.progression import (
         ChallengeNotFound,
         UserNotFound,
@@ -26,19 +28,22 @@ except ImportError:
         ChallengeCompletionResponse,
     )
     from backend.models.user import User
+    from backend.realtime.notify import notify_progress
     from backend.services.progression import (
         ChallengeNotFound,
         UserNotFound,
         award_xp,
     )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["Challenges"])
 
 
 def _complete_challenge(user_id: int, challenge_id: int) -> dict:
-    """Shared helper to award XP and map domain exceptions to HTTP 404."""
+    """Shared helper to award XP, notify progress, and map domain exceptions to HTTP 404."""
     try:
-        return award_xp(user_id=user_id, challenge_id=challenge_id)
+        result = award_xp(user_id=user_id, challenge_id=challenge_id)
     except ChallengeNotFound as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -49,6 +54,13 @@ def _complete_challenge(user_id: int, challenge_id: int) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
+
+    try:
+        notify_progress(result)
+    except Exception:
+        logger.exception("Failed to deliver realtime progress notification for user %s", user_id)
+
+    return result
 
 
 def complete_challenge_by_body(
