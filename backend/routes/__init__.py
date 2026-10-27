@@ -7,6 +7,7 @@ from routes.bug_trigger import router as bug_trigger_router
 from routes.spark_term import router as spark_term_router
 from routes.byte_fact import router as byte_fact_router
 from routes.challenge import router as challenge_router
+from routes.submissions import router as submission_router
 
 __all__ = [
     "user_router",
@@ -18,4 +19,5 @@ __all__ = [
     "spark_term_router",
     "byte_fact_router",
     "challenge_router",
+    "submission_router",
 ]

@@ -17,12 +17,18 @@ class _TokenRequest:
 
 
 def _get_authenticate_request_options() -> AuthenticateRequestOptions:
+    secret_key = os.getenv("CLERK_SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError(
+            "CLERK_SECRET_KEY is not set. Please configure it in your environment or .env file."
+        )
+
     authorized_parties = os.getenv(
         "CLERK_AUTHORIZED_PARTIES", "http://localhost:3000"
     ).split(",")
 
     return AuthenticateRequestOptions(
-        secret_key=os.environ["CLERK_SECRET_KEY"],
+        secret_key=secret_key,
         jwt_key=os.getenv("CLERK_JWT_KEY") or None,
         authorized_parties=authorized_parties,
         accepts_token=["session_token"],
@@ -58,9 +64,17 @@ def get_current_user_id(request: Request) -> str:
     """FastAPI dependency: verifies the Clerk session token on the request
     and returns the Clerk user id (payload["sub"]). Raises 401 if missing/invalid.
     """
+    try:
+        options = _get_authenticate_request_options()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+
     state = authenticate_request(
         request,
-        _get_authenticate_request_options(),
+        options,
     )
 
     if not state.is_signed_in:

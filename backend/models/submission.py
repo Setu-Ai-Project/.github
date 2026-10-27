@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 from sqlalchemy import Column, JSON
 from sqlmodel import Field, SQLModel
 
@@ -40,3 +40,18 @@ class Submission(SubmissionBase, table=True):
 class SubmissionRead(SubmissionBase):
     id: int
     feedback: list[str] = []
+
+
+class SubmissionCreate(SQLModel):
+    challenge_id: int
+    answer_text: str = Field(min_length=1, max_length=5000)
+
+
+class SubmissionResponse(SQLModel):
+    submission_id: int
+    challenge_id: int
+    status: str
+    feedback: list[str]
+    xp_awarded: int
+    attempt_number: int
+    created_at: str

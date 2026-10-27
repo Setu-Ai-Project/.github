@@ -3,6 +3,7 @@
 from datetime import date, datetime, timezone
 import io
 import logging
+import os
 from pathlib import Path
 from typing import Union
 from PIL import Image, ImageDraw, ImageFont
@@ -25,12 +26,30 @@ class ModuleNotFound(Exception):
 
 
 def _get_font_path(font_filename: str) -> Path:
-    """Resolve font path relative to source file location, reaching repo root fonts/."""
-    # services/certificates.py -> services -> backend -> repo_root (e.g. .github) -> fonts
-    font_path = Path(__file__).resolve().parent.parent.parent / "fonts" / font_filename
-    if not font_path.exists():
-        raise FileNotFoundError(f"Required font file not found: {font_path}")
-    return font_path
+    """Resolve font path flexibly across repo root, environment, or container paths."""
+    # 1. Environment variable override
+    env_dir = os.getenv("FONTS_DIR")
+    if env_dir:
+        candidate = Path(env_dir) / font_filename
+        if candidate.exists():
+            return candidate
+
+    # 2. Repo root fonts/ (e.g. .github/fonts or setu ai/fonts)
+    repo_root_font = Path(__file__).resolve().parent.parent.parent / "fonts" / font_filename
+    if repo_root_font.exists():
+        return repo_root_font
+
+    # 3. Backend local fonts/
+    backend_font = Path(__file__).resolve().parent.parent / "fonts" / font_filename
+    if backend_font.exists():
+        return backend_font
+
+    # 4. Frontend public fonts/
+    frontend_font = Path(__file__).resolve().parent.parent.parent / "frontend" / "gamifiedsetu" / "public" / "fonts" / font_filename
+    if frontend_font.exists():
+        return frontend_font
+
+    raise FileNotFoundError(f"Required font file not found: {font_filename}")
 
 
 def _fit_font(
