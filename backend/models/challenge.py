@@ -1,4 +1,5 @@
 from typing import Optional
+from sqlalchemy import Column, JSON
 from sqlmodel import Field, SQLModel
 
 
@@ -12,6 +13,8 @@ class Challenge(ChallengeBase, table=True):
     __tablename__ = "challenges"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    # The answer checker's rules, e.g. {"min_words": 8, "required_keywords": ["mood"]}
+    rules: dict = Field(default_factory=dict, sa_column=Column(JSON))
 
 
 class ChallengeCreate(ChallengeBase):

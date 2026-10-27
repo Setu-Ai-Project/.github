@@ -20,6 +20,12 @@ from models.certificate import (
     CertificateCreate,
     CertificateRead,
 )
+from models.submission import (
+    Submission,
+    SubmissionBase,
+    SubmissionRead,
+    SubmissionStatus,
+)
 
 __all__ = [
     "User",
@@ -70,4 +76,9 @@ __all__ = [
     "CertificateBase",
     "CertificateCreate",
     "CertificateRead",
+    "Submission",
+    "SubmissionBase",
+    "SubmissionRead",
+    "SubmissionStatus",
 ]
+
