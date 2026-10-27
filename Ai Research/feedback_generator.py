@@ -35,6 +35,7 @@ import os
 import json
 import re
 from typing import List, Dict, Any, Optional
+# pyrefly: ignore[missing-import]
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -192,6 +193,7 @@ def generate_feedback(
 
     # Import Anthropic client only when key is provided
     try:
+        # pyrefly: ignore[missing-import]
         import anthropic
     except ImportError:
         raise RuntimeError(
