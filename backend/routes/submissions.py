@@ -4,7 +4,7 @@ from datetime import timezone
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from database import get_session
 from middleware.auth import get_current_user
@@ -13,6 +13,7 @@ from models.submission import (
     Submission,
     SubmissionCreate,
     SubmissionResponse,
+    SubmissionStatus,
 )
 from models.user import User
 from realtime.notify import notify_progress
@@ -23,6 +24,12 @@ from services.verifier import verify_answer
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
+
+PASS_MESSAGE = "Great work! Your answer meets all the requirements."
+SAFETY_FALLBACK_MESSAGE = "Let's keep our submissions friendly, safe, and creative!"
+# Used for challenges that don't have their own rules yet, so an answer still
+# has to be a real attempt rather than a single word.
+DEFAULT_RULES = {"min_words": 5}
 
 
 def _to_response(sub: Submission) -> SubmissionResponse:
@@ -59,63 +66,72 @@ def create_submission(
             detail="Challenge not found",
         )
 
-    # 2. Determine attempt number
-    prev_count = session.exec(
-        select(Submission).where(
-            Submission.user_id == current_user.id,
-            Submission.challenge_id == payload.challenge_id,
-        )
-    ).all()
-    attempt_number = len(prev_count) + 1
+    text = payload.answer_text.strip()
 
-    # 2.5 AI Research Safety Moderation check
-    is_safe, safety_feedback = check_learner_text_safety(payload.answer_text)
-    if not is_safe:
-        submission = Submission(
-            user_id=current_user.id,
-            challenge_id=payload.challenge_id,
-            answer_text=payload.answer_text,
-            status="needs_revision",
-            xp_awarded=0,
-            attempt_number=attempt_number,
-        )
-        submission.feedback = [safety_feedback or "Let's keep our submissions friendly, safe, and creative!"]
-        session.add(submission)
-        session.commit()
-        session.refresh(submission)
-        return _to_response(submission)
+    # 2. Attempt number, and whether this learner already passed this challenge
+    mine = (
+        Submission.user_id == current_user.id,
+        Submission.challenge_id == challenge.id,
+    )
+    previous = session.exec(select(func.count()).select_from(Submission).where(*mine)).one()
+    attempt_number = previous + 1
+    already_passed = session.exec(
+        select(Submission).where(*mine, Submission.status == SubmissionStatus.PASSED)
+    ).first() is not None
 
-    # 3. Verify answer against pedagogical challenge rules
-    rules = {"min_words": 5}
-    verification = verify_answer(payload.answer_text, rules)
+    # 3. AI Research safety moderation. Blank answers skip it so the verifier
+    # gives the contract's "Your answer is empty" message instead.
+    if text:
+        is_safe, safety_feedback = check_learner_text_safety(text)
+        if not is_safe:
+            submission = Submission(
+                user_id=current_user.id,
+                challenge_id=challenge.id,
+                answer_text=text,
+                status=SubmissionStatus.NEEDS_REVISION,
+                attempt_number=attempt_number,
+            )
+            submission.feedback = [safety_feedback or SAFETY_FALLBACK_MESSAGE]
+            session.add(submission)
+            session.commit()
+            session.refresh(submission)
+            return _to_response(submission)
 
-    xp_awarded = 0
+    # 4. Save as pending first, so there is a record of what the learner sent
+    # even if something below fails.
+    submission = Submission(
+        user_id=current_user.id,
+        challenge_id=challenge.id,
+        answer_text=text,
+        status=SubmissionStatus.PENDING,
+        attempt_number=attempt_number,
+    )
+    session.add(submission)
+    session.commit()
+    session.refresh(submission)
+
+    # 5. Verify the answer against this challenge's rules
+    verification = verify_answer(text, challenge.rules or DEFAULT_RULES)
+
     if verification.passed:
-        sub_status = "passed"
-        feedback = ["Great work! Your answer meets all the requirements."]
-        try:
-            res = award_xp(user_id=current_user.id, challenge_id=payload.challenge_id)
-            xp_awarded = res.get("xp_awarded", 0)
+        # 6. Passed: award XP on the first pass only (award_xp also guards itself).
+        # award_xp errors are not caught: the request fails, the row stays pending
+        # (pending doesn't count as passed), and the learner can retry for their XP.
+        submission.status = SubmissionStatus.PASSED
+        submission.feedback = [PASS_MESSAGE]
+        if not already_passed:
+            res = award_xp(user_id=current_user.id, challenge_id=challenge.id)
+            submission.xp_awarded = res.get("xp_awarded", 0)
             try:
                 notify_progress(res)
             except Exception:
                 logger.warning("Realtime progress notification failed for user %s", current_user.id)
-        except Exception as exc:
-            logger.error("Failed to award XP on passing submission: %s", exc)
     else:
-        sub_status = "needs_revision"
-        feedback = verification.feedback
+        # 7. Needs revision: store the specific feedback (a new list, so it saves)
+        submission.status = SubmissionStatus.NEEDS_REVISION
+        submission.feedback = list(verification.feedback)
 
-    # 4. Save submission record
-    submission = Submission(
-        user_id=current_user.id,
-        challenge_id=payload.challenge_id,
-        answer_text=payload.answer_text,
-        status=sub_status,
-        xp_awarded=xp_awarded,
-        attempt_number=attempt_number,
-    )
-    submission.feedback = feedback
+    # 8. Save the result and respond
     session.add(submission)
     session.commit()
     session.refresh(submission)
@@ -149,7 +165,7 @@ def list_submissions(
     stmt = select(Submission).where(Submission.user_id == current_user.id)
     if challenge_id is not None:
         stmt = stmt.where(Submission.challenge_id == challenge_id)
-    stmt = stmt.order_by(Submission.created_at.desc())  # type: ignore
+    stmt = stmt.order_by(Submission.created_at.desc(), Submission.id.desc())  # type: ignore
 
     results = session.exec(stmt).all()
     return [_to_response(sub) for sub in results]
