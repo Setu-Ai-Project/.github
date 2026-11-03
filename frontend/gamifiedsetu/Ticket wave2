@@ -1,0 +1,2106 @@
+# SetuAI Frontend — Wave 2 Tickets (Step 4 + Step 5)
+
+## How to use this file
+
+- **Two tracks run at the same time:**
+
+  | Track | Pair | Tasks | What |
+  |---|---|---|---|
+  | **Step 4** | Pair F1 (3 people) | 15 → 16 → 17 | Learn, Quiz and Builder Challenge screens |
+  | **Step 5** | Pair F2 (3 people) | 18 → 19 → 20 | Skill Map, Progress Dashboard and live unlock celebrations |
+
+  The two tracks don't depend on each other. **Inside a track, the tasks run one after another:** each task starts only when the previous one in **the same track** is **merged to `main`**, and builds on what it added. While you wait for your turn, review the previous task's PR, so you know the code you'll build on.
+- **Find your task.** Each task lists every file to create, the data shapes, the exact on-screen text, the behaviour and the tests. The shared **Project context** below applies to every task.
+- **Working with an AI agent:** copy the **Project context** section below **plus** your whole task (from its `## TASK` heading down to the next `---` line), and paste both into your agent with this instruction:
+  > Implement this ticket in my project. Create exactly the files listed, follow every rule and use the exact on-screen text given. Where the ticket gives code, use that code exactly. Then write the tests described. Before you finish, run `npx vitest run`, `npx tsc --noEmit` and `npm run lint` yourself and fix anything that fails. Do not edit any other files.
+- **Ready-made code:** where a ticket shows a full code block, that code is the agreed version. Paste it (or let the agent use it) instead of re-inventing it. That's where most of the time is saved.
+- **Then you are the reviewer of the agent's work:** read every file it wrote, ask it to explain anything you don't understand, run the checks in "Done when", and fix what fails. You own the result, not the agent.
+- The backend doesn't have lesson, quiz or challenge-content endpoints yet (see "Backend reality" in the Project context), so **all three screens run on mock (fake) data** inside the frontend. One switch connects the real backend later.
+
+## What Step 4 builds (Pair F1)
+
+The Step 5 overview is further down, at the start of the **STEP 5** part.
+
+A learner opens a module and goes through three screens in order:
+
+| Screen | Route | Learner does | Built in |
+|---|---|---|---|
+| Module hub | `/module/[moduleId]` | Picks Learn, Quiz or Challenge | Task 16 |
+| Learn | `/learn/[moduleId]` | Reads a short lesson, one section at a time | Task 16 |
+| Builder Challenge | `/challenge/[moduleId]` | Reads a task, reveals hints, submits an answer | Task 16 |
+| Quiz | `/quiz/[moduleId]` | Answers one question at a time, sees feedback and a final score | Task 17 |
+
+Navigation: Learn → "Take the quiz" → Quiz → "Continue to challenge" → Challenge. Each screen has a small back link.
+
+**The order of work:**
+
+| # | Task | What it adds | Starts when | Target |
+|---|---|---|---|---|
+| 1 | Task 15 — Foundation | Data types, mock data, the API file, and the shared loading/error/layout pieces + `useAsync` | Immediately | ~1.5 days |
+| 2 | Task 16 — Learn, Challenge + Module hub | The Learn screen, the Builder Challenge screen and the module hub page | Task 15 is merged | ~2 days |
+| 3 | Task 17 — Quiz | The Quiz screen, which links the Learn and Challenge screens together | Task 16 is merged | ~2 days |
+| 4 | FINAL | Team check, together | Task 17 is merged | ~half a day |
+
+Whole step: **about 5–6 working days**. The targets are a guide, not a deadline. If you're falling behind a checkpoint, ask for help (see "How we go fast").
+
+**What changed compared to the original Step 4 guide (PDF):**
+- The test tools (Vitest) and `motion` are **already installed**. Nobody runs `npm install <package>` or changes `package.json`.
+- Step 6 is **already built**. The Builder Challenge screen uses the real `SubmissionPanel` instead of a placeholder `handleSubmit`. The separate `WorkArea` component isn't needed because `SubmissionPanel` already has the answer box.
+- The env variables are the ones the app already uses: `NEXT_PUBLIC_USE_MOCK` and `NEXT_PUBLIC_API_URL` (not `NEXT_PUBLIC_API_BASE_URL`).
+- The PDF's `useAsync` example fails our lint rule. Task 15 builds a version that passes (see the reloadKey pattern below).
+
+## Project context (applies to every task — paste it with your task)
+
+- **App:** SetuAI, a gamified learning app for kids. Frontend project root: `frontend/gamifiedsetu`. All paths in the tasks are relative to it.
+- **Stack:** Next.js 16 (App Router), React 19, TypeScript (strict), Tailwind CSS v4, `motion` (Framer Motion's current package; import from `motion/react`). Tests use Vitest + React Testing Library + user-event in jsdom, with jest-dom matchers loaded. Next.js 16 differs from older versions, so check `node_modules/next/dist/docs/` before relying on memory.
+- **Imports:** `@/` points to the project root, and there is **no `src/` folder**. For example: `@/types/learning`, `@/api/learningApi`, `@/app/components/learning/...`.
+- **Folders:**
+  - Shared types go in `types/`.
+  - The fake/real API wrappers go in the root-level `api/`.
+  - Hooks go in `hooks/`.
+  - Components go in `app/components/<feature>/`. Step 4 uses `app/components/common/` (shared building blocks), `app/components/learning/` (learn, challenge, hub) and `app/components/quiz/`. Step 5 uses `app/components/progress/`.
+  - Small **pure functions** (same input → same output, no side effects) go in `utils/`, e.g. `utils/levels.ts`.
+  - **The two tracks don't import each other's new files.** Step 4 and Step 5 are built at the same time, so a file the other track hasn't merged yet may not exist. The one exception is a plain link to the other track's route (e.g. Step 5 linking to `/module/1`), which is fine.
+  - Dev/test pages go in `app/dev/<name>/page.tsx`.
+  - Tests sit next to the file they test, as `<Name>.test.ts(x)`.
+- **Never create anything under `app/api/`.** In the App Router that folder is for server route handlers.
+- **Exports:** components are default exports. Hooks, functions, constants and types are named exports.
+- **Client code:** any file that uses state, effects, refs or event handlers starts with `"use client";`.
+- **Route pages stay tiny.** Each `page.tsx` is a server component that only reads the route param and renders a client "screen" component. Screen components take `moduleId` as a prop, which makes them easy to test without faking the router. In Next.js 16, `params` is a **Promise**:
+  ```tsx
+  import LearnScreen from "@/app/components/learning/LearnScreen";
+
+  export default async function LearnPage({ params }: PageProps<"/learn/[moduleId]">) {
+    const { moduleId } = await params;
+    return <LearnScreen moduleId={moduleId} />;
+  }
+  ```
+  `PageProps` is a global type that Next generates. If `npx tsc --noEmit` says it doesn't know your route, run `npm run dev` once (or `npx next typegen`) so Next generates the route types, then re-run the check.
+- **Login:** `proxy.ts` sends logged-out visitors from any non-public page back to `/`. `/module`, `/learn`, `/quiz` and `/challenge` are real app screens, so **sign in before checking them in the browser**. `/dev/...` pages are public. **Don't edit `proxy.ts`.**
+- **Backend reality (checked on `main`):** the backend runs locally at `http://127.0.0.1:8000`, all JSON field names are **snake_case** (`module_id`, not `moduleId`), and ids are **integers**.
+  - **Exists:**
+    - `GET /modules/{id}` returns the module's `id`, `title`, `description` and `order`.
+    - `GET /sub-modules/?module_id=` returns sub-module titles and descriptions only, with no lesson content.
+    - `POST /submissions` checks challenge answers **on the server** (Step 6 already uses it).
+  - **Seed data:** module 1 is "What Is AI?", with four sub-modules: "Swipe-Sort: AI or Not AI?", "AI History Timeline", "Case Study: DeepMind & the NHS" and "Biased Dataset Sandbox". The seeded challenge (id 1 on a fresh database) is "Describe a sunset"; it passes with 8+ words that include "mood" and "style".
+  - **Missing:**
+    - No lesson-content endpoint.
+    - No quiz or answer-check endpoint.
+    - No endpoint to fetch a challenge.
+    - **No CORS**, so the browser can't call the backend at all yet.
+  - **So:** Step 4 is built and finished on mock data. Task 15 sends Backend the list of what we need, and connecting the real backend is a later follow-up (see the end of this file).
+- **Styling:** Tailwind with the brand tokens from `app/globals.css` only. Don't invent colours.
+  - Colours: `bg-cream`, `bg-coral`, `bg-tealpop`, `bg-white`, `text-ink`, `border-ink`, `text-taskgray`.
+  - Font: `font-display`.
+  - Card look: `rounded-2xl border-4 border-ink bg-white shadow-[8px_8px_0_#172A32]`.
+  - Button look: `rounded-2xl border-4 border-ink font-display font-bold text-ink shadow-[4px_4px_0_#172A32]`. Add a small lift on hover (`transition-transform hover:-translate-y-0.5`), and make it faded with a not-allowed cursor when disabled (`disabled:cursor-not-allowed disabled:opacity-50`). Primary buttons are `bg-coral` or `bg-tealpop`, secondary ones `bg-white`.
+  - Error boxes: `border-2 border-coral` with rounded corners. Never leave a blank screen.
+  - Mobile first: everything must work at 375px wide with no sideways scrolling.
+- **Lint rule `react-hooks/set-state-in-effect` is on.** Inside `useEffect`, never call a function that sets state synchronously; `useEffect(() => { load(); }, [])` **fails lint**. Use the **reloadKey pattern** to load data:
+  - Start the API call inside the effect and handle it with a promise chain (`.then` / `.catch` / `.finally`).
+  - Keep an `ignore` flag that the effect's cleanup sets to true, and skip setting state once it's true.
+  - Keep a `reloadKey` number in state, in the effect's dependency list. Increment it to reload.
+  - Task 15's `useAsync` hook does all of this for you. Screens should use it instead of writing their own effect.
+- **Double-click guard:** for any button that starts an async call, keep a `useRef(false)` "in flight" flag. Return early if it's true, set it to true before the call, and reset it in `finally`. A ref changes instantly; state only changes on the next render.
+- **Mascots (from Step 3 — don't edit these files):** `app/components/mascots/NovaBanner.tsx`, `BugTooltip.tsx`, `SparkCard.tsx`, `ByteStrip.tsx`. All four are default exports taking exactly `{ message: string; onDismiss: () => void }`. They render inline (not floating), so put them in a normal spot in the page flow, never on top of options or buttons.
+  - **Important:** once a mascot is dismissed it removes itself for good. To show one again (for example, Bug on a second wrong answer), render it with a new `key` (a counter you increment), so React creates a fresh one.
+  - Which mascot appears when is our **assumption**. Pair F2 / UI-UX haven't confirmed it yet:
+
+    | Moment | Mascot | Message (exact) | Built in |
+    |---|---|---|---|
+    | Lesson opens | NovaBanner | "Welcome! Let's learn something new." | Task 16 |
+    | Challenge opens (tip bar) | ByteStrip | "Tip: start small, test often." | Task 16 |
+    | Hint revealed | BugTooltip | "Here's a nudge. You've got this!" | Task 16 |
+    | Correct quiz answer | SparkCard | "Nice one!" | Task 17 |
+    | Wrong quiz answer | BugTooltip | "Oops, close! Read the explanation and keep going." | Task 17 |
+    | Quiz finished | SparkCard | "You scored {score} of {total}!" | Task 17 |
+
+  - Mascots use `next/image`. If a test fails because of images, mock `next/image` in that test file with a plain `<img>`.
+- **Tests:**
+  - Import `describe`, `it`, `expect` and `vi` from `vitest`.
+  - Mock a module with `vi.mock("<path>", () => ({ name: vi.fn() }))`, and get a typed handle with `vi.mocked(name)`.
+  - Use `userEvent.setup()` for typing and clicking.
+  - Use `renderHook` + `act` for hooks.
+  - Use `findBy...` queries to wait for async results.
+  - Use `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync(ms)` to skip delays.
+  - Use `vi.stubEnv(name, value)` to fake an env variable, and `vi.unstubAllEnvs()` afterwards.
+- **Checks before every PR:** `npx vitest run`, `npx tsc --noEmit` and `npm run lint` must all pass.
+
+## Team rules (for everyone)
+
+1. **One task at a time per track, in order:** Step 4 = 15 → 16 → 17, Step 5 = 18 → 19 → 20. Start your task only after the previous task **in your track** is merged. Then pull the latest `main`, run `npm install`, and branch from it using the name in your task. If the other track merged something touching a file you also change (only `.env.example` is shared), keep both sets of lines.
+2. **Own branch, never `main`.** Push your branch and open a Pull Request. Never push straight to `main`.
+3. **Hand over clearly.** When your PR is merged, post "Task NN is on main" in the team channel, so the next person can start.
+4. **Review the previous PR.** The owner of the next task is the reviewer of the current task's PR. That way you already know the code you'll build on.
+5. **Only touch the files your task owns.** Found a problem in an earlier task's file? Tell its owner. They fix it on a small branch with a test. **Never edit** the mascot components, `proxy.ts`, `package.json` or anything from Steps 6–7.
+6. **You test what you build.** A PR is ready only when `npx vitest run`, `npx tsc --noEmit` and `npm run lint` all pass.
+7. **Keep your dev page** under `app/dev/` (if your task has one). Don't delete it afterwards. The team uses it to re-check your work.
+8. **Use npm only.** Never run `pnpm` or `yarn`.
+9. **Never silently guess a data shape.** Anything that guesses what Backend will send is marked `// ASSUMPTION - confirm with Backend (SYNC 3)`.
+10. **Use the PR checklist** (it appears automatically from the PR template). For Step 4, also tick: "`.env` not committed" and "Mock mode still works".
+
+### How we go fast
+
+1. **Prepare while you wait.** Before your turn:
+   - read your whole ticket;
+   - review the current PR (you're its reviewer);
+   - write down your test cases from the spec;
+   - check your setup: you can sign in, and your local `.env` has `NEXT_PUBLIC_USE_MOCK=true`.
+
+   When the previous PR merges, you start coding straight away.
+2. **Use the ready-made code.** Paste the code blocks in your ticket; only write by hand what the ticket describes in words.
+3. **Must-haves first.** Each task has a **Must-have** list and a **Polish (only if time left)** list. Open your PR when the must-haves and the tests pass. Polish can come in a later small PR, and it never blocks the next task.
+4. **Open the PR as soon as the checks pass.** Don't wait for "perfect".
+5. **Review within 2 working hours.** The reviewer (the next task's owner) reviews quickly and asks for small fixes. Fixes are small commits on the same PR. Merge the same day, then post "Task NN is on main".
+6. **The 30-minute rule.** Stuck for more than 30 minutes? Post the **exact** error (copied, not paraphrased) in the team channel, and give it to your agent with: *"Here is the exact error. Explain it in plain English, then make the smallest possible fix. Do not change anything else."* Never let the agent rewrite half the project to fix one error.
+7. **Checkpoints.** Each task lists one or two checkpoints. If you miss one, that's the signal to ask for help, not to work late.
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# STEP 4 — Core Learning Screens (Pair F1: Tasks 15 → 16 → 17)
+
+The overview for this step is in "What Step 4 builds" near the top of the file.
+
+---
+
+## TASK 15 — Foundation: Data Layer + Shared Building Blocks
+
+**Order:** 1 of 3. **Starts:** immediately.
+**Owner:** ____________
+**Branch:** `feature/step4-task15-foundation`
+**Depends on:** nothing.
+**Next:** Task 16 starts when your PR is merged. Post "Task 15 is on main" in the team channel.
+**Estimated time:** about 10 hours. Most of the code is given below; the main writing job is the mock content and the three remaining API functions.
+**Checkpoints:**
+- **End of day 1:** types, mock data and `learningApi` done, with their tests passing; `/dev/learning-api-test` works.
+- **Middle of day 2:** building blocks pasted, all 6 test files green, PR open.
+
+### Goal
+Build everything the screens stand on, so Tasks 16 and 17 only have to build screens:
+- One types file describing lesson, quiz and challenge data.
+- Realistic mock data for module 1.
+- The single API file every screen uses.
+- The shared pieces every screen needs to "show loading, show error, show content": `LoadingState`, `ErrorState`, `ScreenShell` and the `useAsync` hook.
+
+### Step 0 — Send the SYNC 3 request (first hour)
+We checked `main`: the backend has modules, sub-modules and submissions, but nothing that serves lesson content, quizzes or a challenge. Post this in the team chat to the Backend Lead, and paste their answer into your PR description:
+> Hi! I'm building Step 4 (Learn, Quiz, Builder Challenge screens). I'm using mock data for now, and these are the endpoints the screens need. The paths are suggestions, so change them if you prefer:
+> 1. `GET /modules/{id}/lesson` → `{ id, module_id, title, sections: [{ heading, body }] }`
+> 2. `GET /modules/{id}/quiz` → `{ id, module_id, title, questions: [{ id, question, options: [], explanation }] }`, **without** the correct answers (so learners can't read them in dev tools).
+> 3. `POST /modules/{id}/quiz/check` with `{ question_id, selected_index }` → `{ correct, correct_index, explanation }`.
+> 4. `GET /modules/{id}/challenge` → the module's builder challenge (`ChallengeRead` exists in `models/challenge.py` but no route returns it). We also need `goal`, `instructions` and `hints` fields for the screen.
+> 5. `CORSMiddleware` allowing `http://localhost:3000`. Right now the browser can't call the backend at all.
+> 6. Please confirm: snake_case field names, and whether these need the Clerk token (`Authorization: Bearer`) like `/submissions` does.
+> Thanks! All my data shapes live in one file (`types/learning.ts`), so changes are easy.
+
+### Files to create / change
+```
+types/learning.ts
+api/mockLearning.ts
+api/mockLearning.test.ts
+api/learningApi.ts
+api/learningApi.test.ts
+.env.example                                   (change: add one variable name)
+app/dev/learning-api-test/page.tsx
+app/components/common/LoadingState.tsx
+app/components/common/LoadingState.test.tsx
+app/components/common/ErrorState.tsx
+app/components/common/ErrorState.test.tsx
+app/components/common/ScreenShell.tsx
+app/components/common/ScreenShell.test.tsx
+hooks/useAsync.ts
+hooks/useAsync.test.ts
+app/dev/screen-states-test/page.tsx
+```
+
+### What to build — Part A: the data layer
+
+**1. `types/learning.ts`** — the shared contract. Use this code **exactly**; Tasks 16 and 17 are built against it.
+```ts
+// ASSUMPTION - replace with Backend's real contract (SYNC 3).
+
+// One part of a lesson: a heading and its text.
+export type LessonSection = { heading: string; body: string };
+
+// A whole lesson for one module.
+export type LearnContent = {
+  id: string;
+  moduleId: string;
+  title: string;
+  sections: LessonSection[];
+};
+
+// One multiple-choice question.
+export type QuizQuestion = {
+  id: string;
+  question: string;
+  options: string[];
+  // May NOT be sent by Backend. Screens must never read it; use checkAnswer() instead.
+  correctIndex?: number;
+  explanation?: string;
+};
+
+// A whole quiz for one module.
+export type Quiz = { id: string; moduleId: string; title: string; questions: QuizQuestion[] };
+
+// The hands-on task at the end of a module.
+export type BuilderChallenge = {
+  // Passed to SubmissionPanel as challengeId, so it must be a numeric string like "1".
+  id: string;
+  moduleId: string;
+  title: string;
+  goal: string;
+  // May contain line breaks (\n).
+  instructions: string;
+  hints: string[];
+};
+
+// The result of checking one quiz answer.
+export type AnswerCheck = { correct: boolean; correctIndex: number; explanation?: string };
+```
+
+**2. `api/mockLearning.ts`** — the fake backend.
+- Export constants `MOCK_FORCE_ERROR = false` (comment: flip to true only locally to test error screens; never commit it as true), `MOCK_DELAY_MS = 600` and `MOCK_CHECK_DELAY_MS = 300`.
+- Export the mock data `mockLearn`, `mockQuiz`, `mockChallenge`, all for `moduleId` `"1"`. They match the backend's seeded module 1, **"What Is AI?"** (beginner level, written for kids):
+  - `mockLearn`: title "What Is AI?" with exactly **4 sections**, whose headings are the seeded sub-modules: "Swipe-Sort: AI or Not AI?", "AI History Timeline", "Case Study: DeepMind & the NHS" and "Biased Dataset Sandbox". One section body must be **very long** (120+ words) and one **very short** (10 words or fewer), so layout bugs show up early.
+  - `mockQuiz`: **4 questions**, one on each section's topic, each with 3–4 options, a `correctIndex` and an `explanation`.
+  - `mockChallenge`: id `"1"` and title "Describe a sunset" (the backend's seeded challenge). Give it a one-sentence `goal`, and `instructions` with at least 3 steps separated by `\n` that ask for **at least 8 words** and say to **mention the mood and the style**. Those are the seeded server rules, so a good answer will also pass once the real backend is connected. Exactly **2 hints**.
+- A private "fake network" helper waits for a given number of ms, then throws `new Error("Mock server is down")` if `MOCK_FORCE_ERROR` is true. Every exported async function calls it first.
+- Export `async mockGetLearnContent(moduleId)`, `async mockGetQuiz(moduleId)`, `async mockGetChallenge(moduleId)`: wait `MOCK_DELAY_MS`; if `moduleId !== "1"` throw `new Error("Module not found")`; otherwise return the matching mock object.
+- Export `async mockCheckAnswer(moduleId, questionId, selectedIndex): Promise<AnswerCheck>`: wait `MOCK_CHECK_DELAY_MS`; find the question in `mockQuiz` (throw `new Error("Question not found")` if missing); return `{ correct: selectedIndex === q.correctIndex, correctIndex: q.correctIndex, explanation: q.explanation }`.
+
+**3. `api/learningApi.ts`** — **the only file that talks to the backend for Step 4.** Screens never call `fetch` or the mock directly.
+- A private helper `shouldUseMock()` that reads the env **when called** (not at the top of the file, so tests can change it): returns true when `process.env.NEXT_PUBLIC_USE_MOCK === "true"` or `process.env.NEXT_PUBLIC_API_URL` is empty. Same rule as `api/submissionApi.ts`.
+- A private helper `requestJson(path, errorMessage, init?)` that `fetch`es `` `${process.env.NEXT_PUBLIC_API_URL}${path}` `` (passing `init` for POSTs), throws `new Error(errorMessage)` if the response isn't ok, and returns the parsed JSON.
+- **Mappers.** The backend speaks snake_case with integer ids; our screens use camelCase with string ids. Write four small private mapper functions that turn the (assumed) backend JSON into our types, the same idea as the mapping at the end of `api/submissionApi.ts`. Convert every id with `String(...)`:
+  - `toLearnContent`: `{ id, module_id, title, sections }` → `LearnContent`
+  - `toQuiz`: `{ id, module_id, title, questions: [{ id, question, options, explanation }] }` → `Quiz`. Never copy a correct answer into the result.
+  - `toBuilderChallenge`: `{ id, module_id, title, goal, instructions, hints }` → `BuilderChallenge`
+  - `toAnswerCheck`: `{ correct, correct_index, explanation }` → `AnswerCheck`
+- Export these four functions. Each returns the mock when `shouldUseMock()` is true; otherwise it calls the backend and runs the mapper. Mark every real path and mapper with `// ASSUMPTION - confirm with Backend (SYNC 3)`:
+  - `getLearnContent(moduleId): Promise<LearnContent>` → real: GET `/modules/${moduleId}/lesson`; error "Could not load lesson".
+  - `getQuiz(moduleId): Promise<Quiz>` → real: GET `/modules/${moduleId}/quiz`; error "Could not load quiz".
+  - `getBuilderChallenge(moduleId): Promise<BuilderChallenge>` → real: GET `/modules/${moduleId}/challenge`; error "Could not load challenge".
+  - `checkAnswer(moduleId, questionId, selectedIndex): Promise<AnswerCheck>` → real: POST JSON `{ question_id: Number(questionId), selected_index: selectedIndex }` with header `Content-Type: application/json` to `/modules/${moduleId}/quiz/check`; error "Could not check answer".
+- Add short comments explaining `async`/`await` and why everything goes through this one file.
+
+**Start from this code.** The helpers, the quiz mapper and `getQuiz` are complete. Write `toLearnContent`, `toBuilderChallenge`, `toAnswerCheck`, `getLearnContent`, `getBuilderChallenge` and `checkAnswer` the same way:
+```ts
+import type { AnswerCheck, BuilderChallenge, LearnContent, Quiz } from "@/types/learning";
+import { mockCheckAnswer, mockGetChallenge, mockGetLearnContent, mockGetQuiz } from "./mockLearning";
+
+// Every Step 4 screen gets its data through this file, so swapping the mock for
+// the real backend later is a change in ONE place.
+
+// Mock or real? Read the env WHEN CALLED (not at the top of the file), so tests
+// can change it. Same rule as api/submissionApi.ts.
+function shouldUseMock(): boolean {
+  return process.env.NEXT_PUBLIC_USE_MOCK === "true" || !process.env.NEXT_PUBLIC_API_URL;
+}
+
+// `async` means this function may need to wait. `await` pauses here until the
+// server answers, without freezing the page.
+async function requestJson<T>(path: string, errorMessage: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, init);
+  if (!res.ok) throw new Error(errorMessage);
+  return (await res.json()) as T;
+}
+
+// ASSUMPTION - confirm with Backend (SYNC 3): the shape we expect the backend to send.
+type RawQuiz = {
+  id: number;
+  module_id: number;
+  title: string;
+  questions: { id: number; question: string; options: string[]; explanation?: string }[];
+};
+
+// Mapper: turns the backend's snake_case + number ids into our camelCase + string ids.
+function toQuiz(raw: RawQuiz): Quiz {
+  return {
+    id: String(raw.id),
+    moduleId: String(raw.module_id),
+    title: raw.title,
+    // Never copy a correct answer into the result.
+    questions: raw.questions.map((q) => ({
+      id: String(q.id),
+      question: q.question,
+      options: q.options,
+      explanation: q.explanation,
+    })),
+  };
+}
+
+export async function getQuiz(moduleId: string): Promise<Quiz> {
+  if (shouldUseMock()) return mockGetQuiz(moduleId);
+  // ASSUMPTION - confirm with Backend (SYNC 3)
+  const raw = await requestJson<RawQuiz>(`/modules/${moduleId}/quiz`, "Could not load quiz");
+  return toQuiz(raw);
+}
+
+// TODO (you): toLearnContent + getLearnContent, toBuilderChallenge + getBuilderChallenge,
+// toAnswerCheck + checkAnswer — same pattern as above.
+```
+For `checkAnswer`, pass `init` to `requestJson`: `{ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question_id: Number(questionId), selected_index: selectedIndex }) }`. Don't use the `any` type anywhere (lint rejects it); describe each raw shape with a `Raw...` type like `RawQuiz`.
+
+**4. `.env.example`** — add `NEXT_PUBLIC_USE_MOCK=` (no value) under the existing variables. In your own local `.env`, set `NEXT_PUBLIC_USE_MOCK=true`. Restart `npm run dev` after changing `.env`.
+
+**5. `app/dev/learning-api-test/page.tsx`** — `"use client"` dev page, heading "Learning API Test", cream background. Four buttons ("Load lesson", "Load quiz", "Load challenge", "Check quiz answer 1 with option 0") that call the matching `learningApi` function for module "1" and show the result as formatted JSON in a `<pre>` (or the error message in a coral box). Show "Loading..." while waiting.
+
+### What to build — Part B: the shared building blocks (code given — paste it)
+
+Read each file after pasting and make sure you can explain it to your reviewer.
+
+**6. `app/components/common/LoadingState.tsx`** — what a screen shows while its data is on the way. Props `{ message?: string }`.
+```tsx
+type LoadingStateProps = {
+  message?: string;
+};
+
+// What a screen shows while its data is on the way. Never a blank page.
+export default function LoadingState({ message = "Getting things ready..." }: LoadingStateProps) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col gap-3 rounded-2xl border-4 border-ink bg-white p-4 shadow-[8px_8px_0_#172A32] sm:p-6"
+    >
+      {/* Pulsing "skeleton" bars hint that content is coming */}
+      <div className="h-6 w-2/3 animate-pulse rounded-lg border-2 border-ink bg-cream" />
+      <div className="h-4 w-full animate-pulse rounded-lg border-2 border-ink bg-cream" />
+      <div className="h-4 w-5/6 animate-pulse rounded-lg border-2 border-ink bg-cream" />
+      <p className="font-display text-base font-bold text-ink">{message}</p>
+    </div>
+  );
+}
+```
+
+**7. `app/components/common/ErrorState.tsx`** — a kind message and a "Try again" button. **The default message lives only here**, so Step 9 can polish the wording in one place.
+```tsx
+"use client";
+
+// The ONE place the default error wording lives.
+const DEFAULT_MESSAGE = "We could not load this right now. Please try again.";
+
+type ErrorStateProps = {
+  message?: string;
+  onRetry: () => void;
+};
+
+// What a screen shows when loading failed: a kind message and a way to retry.
+export default function ErrorState({ message = DEFAULT_MESSAGE, onRetry }: ErrorStateProps) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-col items-start gap-3 rounded-xl border-2 border-coral bg-cream p-4 text-ink"
+    >
+      <p className="font-bold">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded-2xl border-4 border-ink bg-white px-6 py-2 font-display text-lg font-bold text-ink shadow-[4px_4px_0_#172A32] transition-transform hover:-translate-y-0.5"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+```
+
+**8. `app/components/common/ScreenShell.tsx`** — the shared page frame. **It does not render an `h1`**; each screen renders its own title.
+```tsx
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+type ScreenShellProps = {
+  label: string;
+  backHref?: string;
+  backLabel?: string;
+  children: ReactNode;
+};
+
+// The page frame for every learning screen: cream page, centred column,
+// an optional back link and a small coral label. Each screen adds its own <h1>.
+export default function ScreenShell({ label, backHref, backLabel = "Back", children }: ScreenShellProps) {
+  return (
+    <main className="min-h-screen bg-cream text-ink">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:px-6">
+        {backHref && (
+          <Link href={backHref} className="font-display font-bold hover:underline">
+            ← {backLabel}
+          </Link>
+        )}
+        <p className="font-display text-sm font-black uppercase tracking-wider text-coral">{label}</p>
+        {children}
+      </div>
+    </main>
+  );
+}
+```
+
+**9. `hooks/useAsync.ts`** — runs a load function and tracks `data` / `loading` / `error`, with a `reload` for "Try again". It follows the reloadKey pattern, so it passes the `react-hooks/set-state-in-effect` lint rule.
+```ts
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+// Runs an async `load` function and tracks loading / error / data for a screen.
+//
+// `load` must be stable. Wrap it in useCallback with the ids it uses, e.g.
+//   const load = useCallback(() => getQuiz(moduleId), [moduleId]);
+// If you pass a new arrow function every render, the effect re-runs every
+// render and loads forever.
+export function useAsync<T>(load: () => Promise<T>) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  // Increment this to load again (the "reloadKey pattern").
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    // Becomes true when the screen goes away or reloads, so a late answer is ignored.
+    let ignore = false;
+
+    // Only the promise callbacks set state, never the effect body itself (lint rule).
+    load()
+      .then((result) => {
+        if (ignore) return;
+        setData(result);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (ignore) return;
+        setError(err instanceof Error ? err : new Error(String(err)));
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [load, reloadKey]);
+
+  // Called from a "Try again" click, so setting state here is fine.
+  const reload = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((key) => key + 1);
+  }, []);
+
+  return { data, loading, error, reload };
+}
+```
+
+**10. `app/dev/screen-states-test/page.tsx`** — `"use client"` dev page inside a `ScreenShell` (label "Dev", backHref "/dashboard", backLabel "Back to dashboard") with heading "Screen States Test" and three buttons, "Loading", "Error", "Success", that switch what is shown below: `LoadingState`, `ErrorState` (its retry logs "Retry clicked" to the console), or a paragraph "Content loaded!".
+
+### Tests to write
+**`api/mockLearning.test.ts`** — fake timers before each test, real timers after. To run a call: start it, `await vi.advanceTimersByTimeAsync(<delay>)`, then await it.
+1. `mockGetLearnContent("1")`, `mockGetQuiz("1")`, `mockGetChallenge("1")` each resolve with `moduleId` "1".
+2. `mockGetQuiz("99")` rejects with "Module not found". Attach the `rejects` expectation **before** advancing the timers.
+3. `mockGetQuiz("1")` has **not** resolved after `MOCK_DELAY_MS - 1` ms, and has resolved after 1 more ms.
+4. Data sanity: the lesson has exactly 4 sections; the quiz has 4 questions and every `correctIndex` is a valid index into its `options`; the challenge id is "1" and it has exactly 2 hints.
+5. `mockCheckAnswer` with the right index → `correct: true`; with a wrong index → `correct: false` and the right `correctIndex`.
+
+**`api/learningApi.test.ts`** — mock `./mockLearning` (the four mock functions as `vi.fn`s resolving instantly), spy on `globalThis.fetch`, and `vi.unstubAllEnvs()` after each test.
+1. With `NEXT_PUBLIC_USE_MOCK` stubbed to `"true"`: all four functions call their mock with the same arguments, and `fetch` is never called.
+2. **Real mode + mapper:** with `NEXT_PUBLIC_USE_MOCK` stubbed to `""` and `NEXT_PUBLIC_API_URL` stubbed to `"http://api.test"`, and `fetch` mocked to resolve `{ ok: true, json: async () => ({ id: 7, module_id: 1, title: "Q", questions: [{ id: 3, question: "?", options: ["a", "b"] }] }) }`: `getQuiz("1")` fetches `http://api.test/modules/1/quiz` and returns `{ id: "7", moduleId: "1", title: "Q", questions: [{ id: "3", question: "?", options: ["a", "b"] }] }` (ids are strings, and there's no `correctIndex`).
+3. Same setup, but `fetch` resolves `{ ok: false }` → `getLearnContent("1")` rejects with "Could not load lesson".
+4. Real mode, `fetch` resolving `{ correct: false, correct_index: 1, explanation: "e" }` → `checkAnswer("1", "3", 2)` sends method `POST` with a body containing `"question_id":3` and `"selected_index":2`, and returns `{ correct: false, correctIndex: 1, explanation: "e" }`.
+
+**`LoadingState.test.tsx`**
+1. With no props → an element with role `status` containing "Getting things ready...".
+2. With `message="Getting your quiz ready..."` → that text is shown.
+
+**`ErrorState.test.tsx`** — code given. Use it as the example shape for your other component tests:
+```tsx
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import ErrorState from "./ErrorState";
+
+describe("ErrorState", () => {
+  it("shows the default message", () => {
+    render(<ErrorState onRetry={() => {}} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "We could not load this right now. Please try again."
+    );
+  });
+
+  it("shows a custom message instead", () => {
+    render(<ErrorState message="Lesson missing." onRetry={() => {}} />);
+    expect(screen.getByText("Lesson missing.")).toBeInTheDocument();
+  });
+
+  it("calls onRetry when Try again is clicked", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    render(<ErrorState onRetry={onRetry} />);
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+**`ScreenShell.test.tsx`**
+1. Shows the label and the children.
+2. With `backHref="/learn/1"` and `backLabel="Back to lesson"` → a link named "← Back to lesson" pointing to `/learn/1`.
+3. Without `backHref` → there are no links.
+
+**`hooks/useAsync.test.ts`** — code given. Each `load` is created **outside** the render callback, so it stays stable:
+```ts
+import { describe, expect, it, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { useAsync } from "./useAsync";
+
+describe("useAsync", () => {
+  it("starts loading, then returns the data", async () => {
+    const load = vi.fn().mockResolvedValue("hi");
+    const { result } = renderHook(() => useAsync(load));
+    expect(result.current.loading).toBe(true);
+    expect(result.current.data).toBeNull();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data).toBe("hi");
+    expect(result.current.error).toBeNull();
+  });
+
+  it("returns the error when loading fails", async () => {
+    const load = vi.fn().mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useAsync(load));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error?.message).toBe("boom");
+  });
+
+  it("loads again when reload is called", async () => {
+    const load = vi.fn().mockResolvedValueOnce("first").mockResolvedValueOnce("second");
+    const { result } = renderHook(() => useAsync(load));
+    await waitFor(() => expect(result.current.data).toBe("first"));
+    act(() => result.current.reload());
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.data).toBe("second"));
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not load again on a normal re-render (no infinite loop)", async () => {
+    const load = vi.fn().mockResolvedValue("hi");
+    const { result, rerender } = renderHook(() => useAsync(load));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+### Done when
+1. `npx vitest run`: your 6 test files pass. `npx tsc --noEmit` and `npm run lint` are clean.
+2. http://localhost:3000/dev/learning-api-test shows "Loading..." for about half a second, then JSON for each button.
+3. Set `NEXT_PUBLIC_USE_MOCK=false` with `NEXT_PUBLIC_API_URL` pointing to a backend that isn't running → you see a clear error message, not a crash. Set it back.
+4. Set `MOCK_FORCE_ERROR = true` locally → the dev page shows the error message (set it back, don't commit it).
+5. http://localhost:3000/dev/screen-states-test switches between the three states; "Try again" logs to the console; it looks right at 375px wide.
+
+### Must-have vs polish
+- **Must-have (open the PR with these):** everything in Parts A and B, the 6 test files, and both dev pages working.
+- **Polish (only if time left; a later small PR):**
+  - make the mock lesson text more fun and kid-friendly;
+  - add a "Clear" button to `/dev/learning-api-test`.
+
+### Definition of Done
+- [ ] SYNC 3 request sent; Backend's answer (or "no answer yet") is in the PR description
+- [ ] Types match the contract exactly and are marked as assumptions
+- [ ] `learningApi.ts` is the only Step 4 file that calls `fetch` or the mock; real paths and snake_case mappers marked `ASSUMPTION`
+- [ ] Mock data matches the seeded module 1 (4 sub-module sections) and the seeded "Describe a sunset" challenge
+- [ ] Committed with `MOCK_FORCE_ERROR = false`; `.env.example` has `NEXT_PUBLIC_USE_MOCK=` with no value; no `.env` committed
+- [ ] `useAsync` uses the reloadKey pattern, passes lint and is proven not to loop (test 4)
+- [ ] The default error message exists only in `ErrorState.tsx`
+- [ ] 6 test files pass; type check and lint clean
+- [ ] `/dev/learning-api-test` and `/dev/screen-states-test` kept
+- [ ] PR merged and "Task 15 is on main" posted
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 16 — Learn Screen, Builder Challenge Screen + Module Hub
+
+**Order:** 2 of 3. **Starts:** when Task 15 is merged to `main`.
+**Owner:** ____________
+**Branch:** `feature/step4-task16-learn-challenge`
+**Depends on:** Task 15 (types, mock data, `learningApi`, building blocks, `useAsync`).
+**Next:** Task 17 starts when your PR is merged. Post "Task 16 is on main" in the team channel.
+**Estimated time:** about 18 hours (Learn ≈ 8h, Challenge + hints ≈ 8h, module hub ≈ 2h). The loading/error/layout pieces and `useAsync` are already done by Task 15, so you only build screens.
+**Checkpoints:**
+- **End of day 1:** Learn screen + module hub working locally, with tests green.
+- **End of day 2:** Challenge screen done and PR open.
+
+> **Prepare while you wait for Task 15:**
+> - Read this whole task.
+> - Review Task 15's PR (you're its reviewer); look closely at `useAsync` and the building blocks, because you'll use them all day.
+> - Write down your test cases.
+> - Check that you can sign in locally and that your `.env` has `NEXT_PUBLIC_USE_MOCK=true`.
+
+### Goal
+Build the screens around the quiz:
+- The **Learn** screen, where a learner reads a lesson one section at a time.
+- The **Builder Challenge** screen: task, hints and the real Step 6 submission panel.
+- A simple **module hub** page that links the three screens together.
+
+The quiz itself comes next in Task 17. Until then, links to `/quiz/1` show a 404 page, and that's expected.
+
+### Files you use but don't edit
+From Task 15:
+- `@/types/learning`:
+  - `LessonSection` = `{ heading: string; body: string }`
+  - `LearnContent` = `{ id: string; moduleId: string; title: string; sections: LessonSection[] }`
+  - `BuilderChallenge` = `{ id: string; moduleId: string; title: string; goal: string; instructions: string; hints: string[] }`. `instructions` may contain `\n` line breaks.
+- `@/api/learningApi`: `getLearnContent(moduleId): Promise<LearnContent>` and `getBuilderChallenge(moduleId): Promise<BuilderChallenge>`. Both throw on failure.
+- `@/hooks/useAsync`: `useAsync<T>(load: () => Promise<T>)` returns `{ data: T | null; loading: boolean; error: Error | null; reload: () => void }`. **`load` must be stable**: wrap it in `useCallback(() => getLearnContent(moduleId), [moduleId])`, or it will reload forever.
+- `app/components/common/LoadingState.tsx`: `<LoadingState message="..." />`.
+- `app/components/common/ErrorState.tsx`: `<ErrorState onRetry={reload} />` shows a friendly message and a "Try again" button.
+- `app/components/common/ScreenShell.tsx`: `<ScreenShell label="Lesson" backHref="/module/1" backLabel="Back to module">…</ScreenShell>` gives the cream page, centred column, small coral label and back link. It does **not** render an `h1`; your screen does.
+
+From earlier steps:
+- `app/components/submission/SubmissionPanel.tsx` (Step 6): `<SubmissionPanel challengeId={challenge.id} />`. A complete answer box with Submit, status badge, tips, Try again and XP. **Use it as-is; don't edit it.**
+- Mascots: `NovaBanner`, `ByteStrip` and `BugTooltip` (see Project context).
+
+### Files to create
+```
+app/components/learning/LessonSection.tsx
+app/components/learning/LessonSection.test.tsx
+app/components/learning/LearnScreen.tsx
+app/components/learning/LearnScreen.test.tsx
+app/learn/[moduleId]/page.tsx
+app/components/learning/HintList.tsx
+app/components/learning/HintList.test.tsx
+app/components/learning/ChallengeScreen.tsx
+app/components/learning/ChallengeScreen.test.tsx
+app/challenge/[moduleId]/page.tsx
+app/components/learning/ModuleHub.tsx
+app/components/learning/ModuleHub.test.tsx
+app/module/[moduleId]/page.tsx
+```
+
+### What to build — Part A: the Learn screen
+
+**1. `LessonSection.tsx`** — default export, props `{ section: LessonSection }`. A `<section>` with the card look, an `<h2>` heading (`font-display`, bold) and the body as a paragraph with `whitespace-pre-line break-words` and comfortable reading size/line height (`text-base leading-relaxed`, `max-w-prose`).
+
+**2. `LearnScreen.tsx`** — `"use client"`, default export, props `{ moduleId: string }`.
+1. Load with `useAsync` + `getLearnContent(moduleId)` (stable `useCallback`).
+2. Everything is inside `ScreenShell` with label "Lesson", `backHref` `/module/${moduleId}`, `backLabel` "Back to module".
+3. While loading: `<LoadingState message="Getting your lesson ready..." />`. On error: `<ErrorState onRetry={reload} />`.
+4. On success, in this order:
+   - **Mascot slot:** `NovaBanner` with "Welcome! Let's learn something new." (dismissible; keep a `showNova` state).
+   - `<h1>` with the lesson title (`font-display`, large, bold).
+   - **Progress:** text "Section {n} of {total}" and a thin progress bar (`role="progressbar"`, `aria-valuenow` = n, `aria-valuemin` = 1, `aria-valuemax` = total; ink border, teal fill).
+   - **One section at a time:** keep `currentSection` (number, starts 0) in state and show only that `LessonSection`.
+   - **Buttons row:** "Previous" (white, disabled on the first section) and "Next section" (teal, hidden on the last section).
+   - On the **last section only**: a big coral link "Take the quiz" → `/quiz/${moduleId}` (Next.js `<Link>`, button look).
+5. If the lesson has **0 sections**: show "This lesson has no content yet." and still show the "Take the quiz" link.
+
+**3. `app/learn/[moduleId]/page.tsx`** — code given. Your other two route pages (steps 6 and 8) are the same, with a different screen and route:
+```tsx
+import LearnScreen from "@/app/components/learning/LearnScreen";
+
+// Server page: reads the module id from the URL and hands it to the client screen.
+export default async function LearnPage({ params }: PageProps<"/learn/[moduleId]">) {
+  const { moduleId } = await params;
+  return <LearnScreen moduleId={moduleId} />;
+}
+```
+
+### What to build — Part B: the Builder Challenge screen
+
+**4. `HintList.tsx`** — `"use client"`, default export, props `{ hints: string[]; onReveal?: (shownCount: number) => void }`.
+1. If `hints` is empty: show "No hints for this challenge." and nothing else.
+2. Keep `shownCount` (starts 0). Show the first `shownCount` hints as an ordered list; each item starts with bold "Hint {n}:".
+3. Under the list, the text "{shownCount} of {total} hints shown".
+4. A `type="button"` button "Show next hint" (white button look). Clicking it increases `shownCount` by one and calls `onReveal` with the new count. When all hints are shown, the button text is "No more hints" and it is disabled.
+
+**5. `ChallengeScreen.tsx`** — `"use client"`, default export, props `{ moduleId: string }`.
+1. Load with `useAsync` + `getBuilderChallenge(moduleId)` (stable `useCallback`).
+2. Everything is inside `ScreenShell` with label "Builder Challenge", `backHref` `/quiz/${moduleId}`, `backLabel` "Back to quiz".
+3. While loading: `<LoadingState message="Getting your challenge ready..." />`. On error: `<ErrorState onRetry={reload} />`.
+4. On success, in this order:
+   - `ByteStrip` with "Tip: start small, test often." (dismissible; `showByte` state).
+   - `<h1>` with the challenge title, then the `goal` as a short paragraph in `text-taskgray`.
+   - An "Instructions" `<h2>` and a card containing the instructions with `whitespace-pre-line break-words`, so `\n` becomes a new line.
+   - A "Hints" `<h2>` and `<HintList hints={challenge.hints} onReveal={...} />`. Each reveal shows `BugTooltip` with "Here's a nudge. You've got this!". Use a counter as its `key` so it reappears on every reveal, even after being dismissed.
+   - A "Your work" `<h2>` and `<SubmissionPanel challengeId={challenge.id} />`.
+   - At the bottom, a white link "Back to module" → `/module/${moduleId}`.
+5. Put a comment above the `SubmissionPanel` line: `// Step 6's real submission flow. Mock vs real is controlled in api/submissionApi.ts.` Good to know: on the Step 6 mock, typing `correct` passes. Once the real backend is connected, the seeded server rules apply instead (8+ words, including "mood" and "style").
+
+**6. `app/challenge/[moduleId]/page.tsx`** — the tiny server page that renders `<ChallengeScreen moduleId={moduleId} />`.
+
+### What to build — Part C: the module hub
+
+**7. `ModuleHub.tsx`** — default export, props `{ moduleId: string }`. No data loading.
+- Inside `ScreenShell` with label "Module", `backHref` "/dashboard", `backLabel` "Back to dashboard".
+- `<h1>` "Module {moduleId}" and the line "Work through these in order. Each one unlocks the next idea."
+- Three cards (card look) as Next.js `<Link>`s, stacked on phones and in a 3-column grid from `md` up:
+  1. "1. Learn" / "Read a short lesson." → `/learn/${moduleId}`
+  2. "2. Quiz" / "Check what you learned." → `/quiz/${moduleId}`
+  3. "3. Builder Challenge" / "Make something with it." → `/challenge/${moduleId}`
+
+**8. `app/module/[moduleId]/page.tsx`** — the tiny server page that renders `<ModuleHub moduleId={moduleId} />`.
+
+### Tests to write
+**`LessonSection.test.tsx`**
+1. Renders the heading as a level-2 heading and the body text.
+
+**`LearnScreen.test.tsx`** — mock `@/api/learningApi` (`getLearnContent` as a `vi.fn`); mock `next/image` if needed. Use a 3-section fixture.
+1. Shows "Getting your lesson ready..." first, then the title as a level-1 heading and "Section 1 of 3".
+2. "Previous" is disabled on section 1. Clicking "Next section" twice → "Section 3 of 3", the third heading shows, "Next section" is gone, and a "Take the quiz" link points to `/quiz/1`.
+3. Shows the NovaBanner message "Welcome! Let's learn something new.".
+4. `getLearnContent` rejects first, then resolves → the "Try again" button appears; clicking it shows the lesson, and `getLearnContent` was called twice.
+5. A lesson with 0 sections → "This lesson has no content yet." and the "Take the quiz" link.
+
+**`HintList.test.tsx`**
+1. Initially no hint text is visible and "0 of 2 hints shown" is shown.
+2. One click → "Hint 1:" and the first hint are visible, "1 of 2 hints shown", and `onReveal` was called with 1.
+3. Two clicks → the button reads "No more hints" and is disabled.
+4. An empty `hints` array → "No hints for this challenge." and no button.
+
+**`ChallengeScreen.test.tsx`** — mock `@/api/learningApi` (`getBuilderChallenge` as a `vi.fn`). Mock `@/app/components/submission/SubmissionPanel` with a stub default export that renders `<p>Submission panel for {challengeId}</p>`. Mock `next/image` if needed.
+1. Shows "Getting your challenge ready..." first, then the title as a level-1 heading, the goal, and the ByteStrip tip text.
+2. Instructions given as `"Step one\nStep two"` both show.
+3. "Submission panel for 1" is shown (the challenge id is passed through).
+4. Clicking "Show next hint" shows the first hint and "Here's a nudge. You've got this!".
+5. `getBuilderChallenge` rejects → the default ErrorState message shows; after it resolves on retry, the title shows.
+
+**`ModuleHub.test.tsx`**
+1. Shows "Module 1" as a level-1 heading and three links pointing to `/learn/1`, `/quiz/1` and `/challenge/1`.
+
+### Done when
+1. `npx vitest run`: your 5 test files pass (plus Task 15's). `npx tsc --noEmit` and `npm run lint` are clean.
+2. Signed in, http://localhost:3000/module/1 shows three cards. Learn and Builder Challenge open their screens; Quiz shows a 404 for now (Task 17 builds it).
+3. http://localhost:3000/learn/1 shows the loading line, then Nova, the title "What Is AI?" and section 1. Step through all 4 sections; "Take the quiz" appears on the last one.
+4. http://localhost:3000/challenge/1 shows the loading line, then Byte's tip, "Describe a sunset", the instructions on separate lines and the hints. Revealing a hint pops up Bug each time. Typing `correct` in the answer box and submitting gives "Passed!" (Step 6 mock).
+5. Edge cases:
+   - Set `MOCK_FORCE_ERROR = true` in `api/mockLearning.ts` locally → both screens show the friendly error and "Try again" (set it back, don't commit it).
+   - `/learn/99` shows the friendly error.
+   - The very long lesson section wraps, and very long text in the answer box doesn't break the layout.
+   - At 375px nothing overflows, and mascots never cover the buttons, the hint button or Submit.
+
+### Must-have vs polish
+- **Must-have (open the PR with these):** Parts A, B and C, the 5 test files, and the "Done when" checks.
+- **Polish (only if time left; a later small PR):**
+  - a smooth fill on the lesson progress bar (`transition-all duration-300`);
+  - a hover lift on the module hub cards;
+  - a small "✓" next to hints already revealed.
+
+### Definition of Done
+- [ ] Learn screen: loading, error + retry, empty and success states; one section at a time with progress; NovaBanner dismissible
+- [ ] Challenge screen uses the real `SubmissionPanel` unchanged; hints reveal one at a time with a counter; ByteStrip and BugTooltip at the agreed moments
+- [ ] Module hub links all three screens
+- [ ] No `fetch` and no mock imports in your files; everything goes through `@/api/learningApi`
+- [ ] 5 test files pass; type check and lint clean
+- [ ] PR merged and "Task 16 is on main" posted
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## TASK 17 — Quiz Screen
+
+**Order:** 3 of 3. **Starts:** when Task 16 is merged to `main`.
+**Owner:** ____________
+**Branch:** `feature/step4-task17-quiz`
+**Depends on:** Task 15 (types, `learningApi`, building blocks, `useAsync`) and Task 16 (the Learn and Challenge screens your quiz links to).
+**Next:** the FINAL team check. Post "Task 17 is on main" in the team channel.
+**Estimated time:** about 16 hours (card + result ≈ 4h, quiz logic ≈ 7h, mascots + edge cases ≈ 3h, self-review ≈ 2h). Loading/error/layout, `useAsync` and `checkAnswer` already exist, and the route page is a copy of Task 16's.
+**Checkpoints:**
+- **End of day 1:** `QuizQuestionCard` and `QuizResult` with their tests green, and `/dev/quiz-card-test` working.
+- **End of day 2:** full quiz flow with mascots, all tests green, PR open.
+
+> **Prepare while you wait for Task 16:**
+> - Read this whole task.
+> - Review Task 16's PR (you're its reviewer); look at how `LearnScreen` uses `useAsync`, because your quiz loads the same way.
+> - Write down your test cases.
+> - Sketch the quiz state on paper: which button shows when, and what resets on "Next question".
+
+### Goal
+Build the quiz: one question at a time, pick an answer, press "Check answer", see right/wrong feedback with an explanation, move on, and get a final score with a friendly message. This is where React state really matters. It's the last piece: after this, a learner can walk Learn → Quiz → Challenge without typing a URL.
+
+### Files you use but don't edit
+From Task 15:
+- `@/types/learning`:
+  - `QuizQuestion` = `{ id: string; question: string; options: string[]; correctIndex?: number; explanation?: string }`
+  - `Quiz` = `{ id: string; moduleId: string; title: string; questions: QuizQuestion[] }`
+  - `AnswerCheck` = `{ correct: boolean; correctIndex: number; explanation?: string }`
+- `@/api/learningApi`: `getQuiz(moduleId): Promise<Quiz>` and `checkAnswer(moduleId, questionId, selectedIndex): Promise<AnswerCheck>`. Both throw on failure.
+- **Never read `question.correctIndex` in the screen.** The real backend may not send it, because a curious learner could read it in the browser's dev tools and cheat. Always ask `checkAnswer()`; it's the one place to change later.
+- `@/hooks/useAsync`: `useAsync(load)` returns `{ data, loading, error, reload }`. **`load` must be stable**: wrap it in `useCallback(() => getQuiz(moduleId), [moduleId])`, or it will reload forever.
+- `app/components/common/LoadingState.tsx`, `ErrorState.tsx` and `ScreenShell.tsx` (used exactly as on the Learn screen: `<LoadingState message="..." />`, `<ErrorState onRetry={reload} />`, `<ScreenShell label backHref backLabel>`).
+
+From Task 16 (only linked to, not imported): `/learn/[moduleId]` and `/challenge/[moduleId]`.
+Mascots: `SparkCard` and `BugTooltip` (see Project context).
+
+### Files to create
+```
+app/components/quiz/QuizQuestionCard.tsx
+app/components/quiz/QuizQuestionCard.test.tsx
+app/components/quiz/QuizResult.tsx
+app/components/quiz/QuizResult.test.tsx
+app/components/quiz/QuizScreen.tsx
+app/components/quiz/QuizScreen.test.tsx
+app/quiz/[moduleId]/page.tsx
+app/dev/quiz-card-test/page.tsx
+```
+
+### What to build
+
+**1. `QuizQuestionCard.tsx`** — `"use client"`, default export. Display only, with no API calls. Props:
+`{ question: QuizQuestion; selectedIndex: number | null; onSelect: (index: number) => void; isChecked: boolean; correctIndex?: number }`
+1. A `<fieldset>` with the card look. The `<legend>` is the question text (`font-display`, large, bold, `break-words`).
+2. One option per item, built from **real radio inputs** so keyboard users get Tab + arrow keys for free. Each is a `<label>` that looks like a big tappable button (full width, ink border, rounded, padding, `min-h-12`) wrapping an `<input type="radio">` (all sharing `name={question.id}`) and the option text. `checked` = `selectedIndex === index`; `onChange` calls `onSelect(index)`.
+3. The selected option (before checking) has a `bg-cream` background and a thicker border.
+4. When `isChecked` is true:
+   - All radios are disabled.
+   - If `correctIndex` is known, the correct option is `bg-tealpop` with the text label "Correct".
+   - A wrong selected option is `bg-coral` with the text label "Not quite".
+   - Colour is never the only signal; the text labels are always shown.
+
+**2. `QuizResult.tsx`** — default export, props `{ score: number; total: number; moduleId: string; onRetry: () => void }`.
+1. A card with an `<h2>` "Quiz complete!" and the big text "You scored {score} of {total}".
+2. A message depending on the score:
+   - `score === total` → "Perfect score! You really know this."
+   - `score >= total / 2` → "Great work! Review the ones you missed and you will have it."
+   - otherwise → "Good effort! Every expert started here. Try again and you will improve."
+3. Buttons: a `type="button"` "Try again" (white button look) that calls `onRetry`, and a coral `<Link>` "Continue to challenge" → `/challenge/${moduleId}`.
+
+**3. `QuizScreen.tsx`** — `"use client"`, default export, props `{ moduleId: string }`.
+1. Load with `useAsync` + `getQuiz(moduleId)` (stable `useCallback`). Inside `ScreenShell` with label "Quiz", `backHref` `/learn/${moduleId}`, `backLabel` "Back to lesson". While loading: `<LoadingState message="Getting your quiz ready..." />`. On error: `<ErrorState onRetry={reload} />`.
+2. If the quiz has 0 questions: `<h1>` with the quiz title and "This quiz has no questions yet. Check back soon!".
+3. **State** (all in this component, one comment above each):
+   - `currentIndex`: which question am I on? (starts 0)
+   - `selectedIndex`: which option has the learner picked? (`number | null`, starts null)
+   - `checkResult`: the `AnswerCheck` for this question, or null if not checked yet. "Is checked" means `checkResult !== null`.
+   - `checking`: true while waiting for `checkAnswer`.
+   - `checkError`: a string message, or "".
+   - `score`: how many correct so far (starts 0).
+   - `finished`: are we on the results screen? (starts false)
+   - Plus the mascot state (step 6 below).
+4. **Layout while playing:** `<h1>` quiz title; progress text "Question {n} of {total}" with a progress bar (`role="progressbar"`, `aria-valuenow`/`aria-valuemin`/`aria-valuemax`); the `QuizQuestionCard`; then a feedback area wrapped in `aria-live="polite"`; then the main button.
+5. **The flow:**
+   - Picking an option sets `selectedIndex` (only allowed before checking).
+   - Main button **"Check answer"** (teal): disabled until an option is picked; shows "Checking..." and is disabled while `checking`. On click, with the **double-click guard** from the Project context, call `checkAnswer(moduleId, question.id, selectedIndex)`.
+     - On success: store `checkResult`; if `correct`, increase `score` (functional setter) and call `onCorrect()`, otherwise call `onWrong()`.
+     - On failure: set `checkError` to "We could not check your answer. Please try again." (coral-bordered box) and keep the selection so they can press Check again.
+   - After checking, the feedback area shows "Correct!" or "Not quite." in bold, then the `explanation` if there is one. The main button becomes **"Next question"**, or **"See results"** on the last question.
+   - "Next question": increase `currentIndex`, reset `selectedIndex`, `checkResult`, `checkError` and the mascot.
+   - "See results": set `finished` to true and call `onFinish(score)`.
+6. **Mascot moments** — three named functions, so the mascots plug in one clear place:
+   - Keep `mascot` state (`"correct" | "wrong" | "finish" | null`) and a `mascotKey` counter. Each function sets `mascot` and increments `mascotKey`.
+   - `onCorrect()` → `SparkCard` "Nice one!"
+   - `onWrong()` → `BugTooltip` "Oops, close! Read the explanation and keep going."
+   - `onFinish(score)` → `SparkCard` "You scored {score} of {total}!"
+   - Render the mascot **below the feedback area and above the main button**, with `key={mascotKey}`. Its `onDismiss` sets `mascot` to null.
+7. **When `finished`:** show the finish mascot and `<QuizResult score total moduleId onRetry={restart} />`. `restart` resets every state variable to its starting value **without reloading the quiz**.
+
+**4. `app/quiz/[moduleId]/page.tsx`** — copy `app/learn/[moduleId]/page.tsx` from Task 16 and change it to render `<QuizScreen moduleId={moduleId} />` (route type `PageProps<"/quiz/[moduleId]">`).
+
+**5. `app/dev/quiz-card-test/page.tsx`** — `"use client"` dev page, heading "Quiz Card Test", cream background. It shows, with hard-coded data:
+- A `QuizQuestionCard` you can click (its own `selectedIndex` state, not checked).
+- A card checked with a wrong answer selected (correct one green, wrong one red).
+- `QuizResult` once, 2 of 4 (retry logs to the console).
+
+### Tests to write
+**`QuizQuestionCard.test.tsx`**
+1. Shows the question as the group name (`getByRole("group", { name: ... })`) and one radio per option.
+2. Clicking an option's label calls `onSelect` with its index.
+3. `isChecked` with `correctIndex` 1 and `selectedIndex` 0 → "Correct" and "Not quite" are both shown, and every radio is disabled.
+4. `isChecked` with `selectedIndex` equal to `correctIndex` → "Correct" is shown and "Not quite" is not.
+
+**`QuizResult.test.tsx`**
+1. 4 of 4 → "You scored 4 of 4" and "Perfect score! You really know this.".
+2. 2 of 4 → the "Great work!..." message. 0 of 4 → the "Good effort!..." message.
+3. Clicking "Try again" calls `onRetry`; the "Continue to challenge" link points to `/challenge/1`.
+
+**`QuizScreen.test.tsx`** — mock `@/api/learningApi` with `getQuiz` and `checkAnswer` as `vi.fn`s. Use a 2-question fixture **without `correctIndex`**. Make `checkAnswer` answer instantly from a lookup inside the test (question 1's answer is option 0, question 2's is option 1). Mock `next/image` if needed.
+1. **Full journey, all correct:** "Getting your quiz ready..." → "Question 1 of 2"; "Check answer" is disabled; pick the right option → it's enabled; click → "Correct!" and "Nice one!"; click "Next question" → "Question 2 of 2"; answer right → button "See results"; click → "You scored 2 of 2" and "Perfect score! You really know this.".
+2. **All wrong:** → "You scored 0 of 2" and the encouraging "Good effort!..." message. "Oops, close!..." appeared after the first wrong answer.
+3. **Try again** on the results → back to "Question 1 of 2", nothing selected, and `getQuiz` was called only once (no reload).
+4. **Double-click:** `checkAnswer` returns a promise you resolve manually; click "Check answer" twice → the button shows "Checking..." and `checkAnswer` was called once.
+5. `checkAnswer` rejects → "We could not check your answer. Please try again." appears, and "Check answer" can be clicked again.
+6. `getQuiz` rejects, then resolves → the ErrorState shows; after "Try again" the quiz shows.
+7. Quiz with 0 questions → "This quiz has no questions yet. Check back soon!".
+
+### Self-review (before opening the PR)
+Ask your agent: *"Review app/components/quiz/QuizScreen.tsx like a senior developer. List bugs, unclear names and missing edge cases. Do not change anything yet."* Decide with your reviewer which suggestions to accept, and note them in the PR description.
+
+### Done when
+1. `npx vitest run`: your 3 test files pass (plus Tasks 15 and 16's). `npx tsc --noEmit` and `npm run lint` are clean.
+2. http://localhost:3000/dev/quiz-card-test shows the clickable card, the checked card (green correct, red wrong, with "Correct" / "Not quite" labels) and the result card.
+3. Signed in, at http://localhost:3000/quiz/1:
+   - All correct → full marks and the perfect-score message.
+   - All wrong → 0 and the encouraging message.
+   - "Try again" resets everything.
+   - "Continue to challenge" opens the real Challenge screen at `/challenge/1`, and "Back to lesson" opens `/learn/1`.
+4. The Learn screen's "Take the quiz" and the module hub's Quiz card now open your quiz (no more 404).
+5. **Keyboard only** (Tab, arrow keys, Space/Enter): you can play the whole quiz.
+6. Refresh mid-quiz → no crash (it's fine that progress restarts). Mascots never cover the options or the main button at 375px. No red console errors.
+
+### Must-have vs polish
+- **Must-have (open the PR with these):** everything in "What to build", the 3 test files, the self-review and the "Done when" checks.
+- **Polish (only if time left; a later small PR):**
+  - **Question transitions:** wrap the question card in `motion`'s `AnimatePresence` + `motion.div` keyed by `currentIndex`, for a short fade/slide between questions. Import from `motion/react`; it's already installed, so don't add any other animation library. If it makes tests flaky, leave it out.
+  - **More dev-page states:** a card checked with the right answer, a card with a very long question and option, and `QuizResult` at 4 of 4 and 0 of 4.
+
+### Definition of Done
+- [ ] One question at a time, with progress; Check is disabled until something is picked; a double-click checks once
+- [ ] The screen never reads `question.correctIndex`; all checking goes through `checkAnswer()`
+- [ ] Right/wrong feedback uses text labels as well as colour; explanation shown
+- [ ] Results give a score-based, kind message; "Try again" fully resets; "Continue to challenge" works
+- [ ] Mascots fire from `onCorrect` / `onWrong` / `onFinish` and re-appear correctly (keyed)
+- [ ] Loading, error + retry, check-error and empty states all handled
+- [ ] Self-review done and noted in the PR
+- [ ] 3 test files pass; type check and lint clean
+- [ ] `/dev/quiz-card-test` kept
+- [ ] PR merged and "Task 17 is on main" posted
+
+---
+
+## FINAL — Step 4 Team Check (all three of you, after Task 17 is merged)
+
+Done **together**. It is not one person's job.
+1. Everyone pulls `main` and runs `npm install`.
+2. `npx vitest run` → all 14 Step 4 test files pass, along with everything else. `npx tsc --noEmit`, `npm run lint` and `npm run build` are clean.
+3. Search the project for `fetch(`: in Step 4 code it should appear only in `api/learningApi.ts`.
+4. Each owner opens their dev pages and confirms they still work:
+   - Task 15: `/dev/learning-api-test` and `/dev/screen-states-test`
+   - Task 17: `/dev/quiz-card-test`
+5. Together, signed in, starting at `/module/1` and **without typing a URL**:
+   1. Learn: Nova welcomes you; step through all the sections; click "Take the quiz".
+   2. Quiz: get one wrong (Bug appears) and the rest right (Spark appears); see results; click "Continue to challenge".
+   3. Challenge: Byte's tip shows; reveal both hints (Bug each time); submit `hello` (needs revision), then `correct` (Passed! + XP).
+   4. Repeat at 375px wide, and once using only the keyboard.
+   5. Check there are no red console errors.
+6. Ask Pair F2 / UI-UX to confirm the mascot-moment table. Any change is a small follow-up PR by the screen's owner.
+7. If anything is broken, the file's owner fixes it on a new branch **with a test that would have caught it**.
+8. Post the handoff in the team channel:
+   - **Done:** Learn, Quiz and Builder Challenge screens plus the module hub, with loading/error/empty states, mascots and tests.
+   - **Routes for Pair F2's Skill Map:** `/module/[moduleId]`, `/learn/[moduleId]`, `/quiz/[moduleId]`, `/challenge/[moduleId]`.
+   - **Mocked:** `api/mockLearning.ts` (module "1" only), via `NEXT_PUBLIC_USE_MOCK=true` or an empty `NEXT_PUBLIC_API_URL`.
+   - **Reusable:** `LoadingState`, `ErrorState`, `ScreenShell` in `app/components/common/` and `useAsync` in `hooks/`.
+   - **Open questions for Backend:** the SYNC 3 answers still missing.
+
+**Later: connect the real backend (Phase 8 of the guide; one small follow-up PR by Task 15's owner).**
+This is **blocked on Backend** and isn't part of Step 4's Definition of Done. It can only start when Backend has added the lesson, quiz, quiz-check and challenge endpoints **and** CORS for `http://localhost:3000` (the SYNC 3 request in Task 15). Then:
+1. Start the backend (`http://127.0.0.1:8000`). Put that address in `NEXT_PUBLIC_API_URL` in your local `.env`, set `NEXT_PUBLIC_USE_MOCK=false` and restart `npm run dev`.
+2. Open DevTools → Network, load `/learn/1` and compare the JSON with what the mappers in `api/learningApi.ts` expect.
+3. If the shapes or paths differ, **fix the mappers and paths in `api/learningApi.ts` only**, so no screen changes. Update `types/learning.ts` only if a field is genuinely new. Remove the `ASSUMPTION` comments that are now confirmed.
+4. If the endpoints need login, pass the Clerk token the same way `api/submissionApi.ts` does (`Authorization: Bearer`).
+5. A CORS error is a Backend setting: send them the exact error and our origin (`http://localhost:3000`).
+6. Switch `NEXT_PUBLIC_USE_MOCK` back to `true` and check everything still works, so teammates can keep developing offline.
+
+---
+
+
+
+
+
+
+
+
+
+
+# STEP 5 — Skill Map, Progress Dashboard + Live Unlocks (Pair F2: Tasks 18 → 19 → 20)
+
+## What Step 5 builds
+
+Learners need to **see how far they've come** and **feel rewarded** when something unlocks. Step 5 delivers three pieces:
+
+| Piece | What the learner sees | Route |
+|---|---|---|
+| **Skill Map** | Every skill as a card: **Locked** (faded, shows what it needs), **In progress** (with a % bar) or **Complete** (with XP earned), arranged in tiers | `/skill-map` (new) |
+| **Progress Dashboard** | Level badge, total XP, an animated bar to the next level, "3 of 10 skills complete" and what to do next | Inside the **existing** `/dashboard` page |
+| **Live unlock celebration** | The moment a skill unlocks or the learner levels up, Spark pops up, without refreshing the page | Both pages |
+
+**How "live" works:**
+- **Polling:** the page asks for fresh progress every 5 seconds. This works today with mock data.
+- **WebSocket:** the backend "rings a doorbell" the moment something important happens, and the page fetches immediately.
+
+The visual components never know which of the two is being used: the data source sits behind one hook.
+
+**The order of work:**
+
+| # | Task | What it adds | Starts when | Target |
+|---|---|---|---|---|
+| 1 | Task 18 — Progress foundation | Types, level maths, a mock backend you can change while the app runs, the API file, the polling hook, the DEV ONLY simulator | Immediately | ~1.5 days |
+| 2 | Task 19 — Skill Map + Dashboard visuals | Skill cards, the tiered map, the XP bar, the progress dashboard, the `/skill-map` page, live data in `/dashboard` | Task 18 is merged | ~2.5 days |
+| 3 | Task 20 — Live updates + celebration | Unlock detection, Spark celebration, WebSocket hook, the combined `useLiveProgress` hook | Task 19 is merged | ~2.5 days |
+| 4 | FINAL | Team check, together | Task 20 is merged | ~half a day |
+
+Whole step: **about 6–7 working days**, at the same time as Step 4.
+
+**What changed compared to the original Step 5 guide (PDF):**
+- **`/dashboard` already exists** (UI/UX's page with a hard-coded "50 XP" and a fake bar). We **don't** create a new one. Task 19 swaps only the hard-coded XP and level card for live data, and leaves the rest of UI/UX's page alone.
+- **Folders follow this repo**, not the PDF's `lib/` and `components/` (see Project context).
+- **Levels use the backend's real rule**, not "every 100 XP": level 2 at 100 XP, level 3 at 250, level 4 at 500, level 5 (max) at 1000.
+- **The WebSocket already exists** on the backend, but it sends small events, not full progress. So we use it as a doorbell (see below).
+- **No extra packages:** no `ws` mock server. The socket is tested with a fake `WebSocket` inside Vitest.
+- **`motion`** is the installed animation library (import from `motion/react`), not `framer-motion`.
+
+### Backend reality for Step 5 (checked on `main`)
+- **Exists:**
+  - **`GET /progress/me`** (needs the Clerk token as `Authorization: Bearer`) returns `{ total_xp, level, xp_to_next_level, badges, certificates }`.
+    - `xp_to_next_level` is the XP **still needed**, and 0 at the max level.
+    - It returns **404 for a brand-new learner** who has no progress row yet.
+  - **`/ws?token=<Clerk token>`** is a WebSocket. A bad or missing token closes it with code 1008. It sends:
+    - `{"type":"level_up","level":2,"previous_level":1,"total_xp":100}`
+    - `{"type":"badge_unlocked","badge":{"slug":"first-steps","name":"First Steps"}}`
+    - `"pong"` (plain text) when you send `"ping"`.
+
+    Plain XP gains that don't level up are **not** pushed, which is why polling never fully stops.
+- **Missing:**
+  - **No skills at all:** no locked / in-progress / complete status and no prerequisites. Real mode shows the XP and level, but an empty skill map until Backend adds skills (Task 18 asks them).
+  - **No CORS:** the browser can't call `/progress/me` yet. WebSockets aren't blocked by CORS.
+- **Seed data used for the mock skills** (sub-modules of the 3 seeded modules):
+  - module 1 "What Is AI?";
+  - module 2 "Prompt Engineering";
+  - module 3 "AI Entrepreneurship".
+
+### Step 5 mascot moments (assumption: confirm with UI/UX)
+| Moment | Mascot | Message (exact) | Built in |
+|---|---|---|---|
+| A skill unlocks | SparkCard | "You unlocked {skill name}!" | Task 20 |
+| Level up | SparkCard | "Level up! You reached level {n}!" | Task 20 |
+
+`SparkCard` (`app/components/mascots/SparkCard.tsx`) takes `{ message, onDismiss }` and fades out when dismissed. Give each celebration its own `key` so a new one appears fresh. **Don't edit the mascot files.**
+
+---
+
+
+
+
+
+
+
+
+
+## TASK 18 — Progress Foundation: Types, Mock Backend, API + Polling
+
+**Order:** 1 of 3 in Step 5. **Starts:** immediately (at the same time as Step 4's Task 15).
+**Owner:** ____________
+**Branch:** `feature/step5-task18-progress-foundation`
+**Depends on:** nothing.
+**Next:** Task 19 starts when your PR is merged. Post "Task 18 is on main" in the team channel.
+**Estimated time:** about 12 hours. The types, level maths, API file and polling hook are given as code; the main writing job is the mock backend and its tests.
+**Checkpoints:**
+- **End of day 1:** types, levels, mock backend + API with tests green.
+- **Middle of day 2:** polling hook + simulator + dev page working, PR open.
+
+### Goal
+Build everything Step 5's screens stand on:
+- the progress **types**;
+- the **level maths** (same rule as the backend);
+- a **mock backend you can change while the app runs** (so you can test an "instant unlock" without the real backend);
+- the **API file** that switches between mock and real;
+- a **polling hook** that keeps progress fresh;
+- a **DEV ONLY simulator** button.
+
+### Step 0 — Send the SYNC 4 request (first hour)
+Post this in the team chat to the Backend Lead, and paste their answer into your PR description:
+> Hi! I'm building Step 5 (Skill Map + Progress Dashboard + live unlocks). I'm using mock data and polling for now. We checked `main` and found `/progress/me` and `/ws`, thanks! To finish the feature we need:
+> 1. **Skill status per learner.** Please add a `skills` list to `GET /progress/me` (or a new `GET /progress/me/skills`). Each skill: `{ id, name, description, module_id, status, prerequisites: [ids], xp_reward, progress }`. One skill per sub-module would be perfect.
+> 2. **Exact status words:** we're assuming `"locked"`, `"in-progress"`, `"complete"`. Please confirm the spelling (hyphen vs underscore) and case.
+> 3. **CORS** (`CORSMiddleware`) allowing `http://localhost:3000`. The browser can't call `/progress/me` yet.
+> 4. `/progress/me` returns **404 for a brand-new learner**. Could it create the row (like `/submissions` does) and return zero progress instead?
+> 5. **WebSocket:** could it also push a message when XP is gained without a level-up (e.g. `{"type":"xp_gained","total_xp":…}`), or push the full progress object? Today only `level_up` and `badge_unlocked` are sent.
+> 6. Please confirm that passing the Clerk session token as `/ws?token=...` is the intended way to log in to the WebSocket.
+> Thanks! All our data shapes are in one file (`types/progress.ts`), so changes are easy.
+
+### Files to create / change
+```
+types/progress.ts
+utils/levels.ts
+utils/levels.test.ts
+api/mockProgress.ts
+api/mockProgress.test.ts
+api/progressApi.ts
+api/progressApi.test.ts
+hooks/useProgressPolling.ts
+hooks/useProgressPolling.test.ts
+app/components/progress/DevSimulator.tsx
+app/dev/progress-test/page.tsx
+.env.example                                   (change: add variable names)
+```
+
+### What to build
+
+**1. `types/progress.ts`** — the shared contract. Use this code **exactly**; Tasks 19 and 20 are built against it.
+```ts
+// ASSUMPTION - replace with Backend's real contract (SYNC 4).
+
+// The three states a skill can be in. The status words are written ONLY here;
+// everything else imports this type. If Backend spells them differently, fix it here.
+export type SkillStatus = "locked" | "in-progress" | "complete";
+
+// One skill on the map (today: one seeded sub-module).
+export type Skill = {
+  id: string;
+  name: string;
+  description: string;
+  // The module this skill belongs to. Clicking the skill opens /module/{moduleId}.
+  moduleId: string;
+  status: SkillStatus;
+  // Ids of the skills that must be complete before this one unlocks.
+  prerequisites: string[];
+  xpReward: number;
+  // 0-100. Only in-progress skills have it.
+  progress?: number;
+};
+
+// Everything the Skill Map and the Dashboard need, at one moment in time.
+export type ProgressSnapshot = {
+  totalXp: number;
+  level: number;
+  // XP earned inside the current level.
+  xpIntoLevel: number;
+  // How big the current level is, in XP. 0 at the max level.
+  xpForNextLevel: number;
+  skills: Skill[];
+};
+```
+
+**2. `utils/levels.ts`** — the level maths, copied from the backend's `backend/config/progression_rules.py`. Use this code exactly:
+```ts
+// Copied from backend/config/progression_rules.py. Keep the two in sync.
+// Level N starts at this much total XP.
+export const LEVEL_THRESHOLDS: Record<number, number> = { 1: 0, 2: 100, 3: 250, 4: 500, 5: 1000 };
+export const MAX_LEVEL = 5;
+
+export type LevelProgress = { level: number; xpIntoLevel: number; xpForNextLevel: number };
+
+// A pure function: works out the level and how far into it a learner is, from total XP alone.
+export function levelProgress(totalXp: number): LevelProgress {
+  const xp = Math.max(0, totalXp);
+
+  // The highest level whose starting XP we have reached.
+  let level = 1;
+  for (let lvl = 1; lvl <= MAX_LEVEL; lvl++) {
+    if (xp >= LEVEL_THRESHOLDS[lvl]) level = lvl;
+  }
+
+  const xpIntoLevel = xp - LEVEL_THRESHOLDS[level];
+  // At the max level there is no next level, so the level has no size.
+  const xpForNextLevel =
+    level >= MAX_LEVEL ? 0 : LEVEL_THRESHOLDS[level + 1] - LEVEL_THRESHOLDS[level];
+
+  return { level, xpIntoLevel, xpForNextLevel };
+}
+```
+
+**3. `api/mockProgress.ts`** — a fake backend you can change **while the app is running**.
+- Export constants:
+  - `MOCK_FORCE_ERROR = false` (comment: flip to true only locally to test error states; never commit it as true);
+  - `MOCK_DELAY_MS = 400`.
+- **The starting skills.** Each is worth `xpReward: 50`, and the names are the backend's seeded sub-modules:
+
+  | id | name | moduleId | prerequisites | starting status |
+  |---|---|---|---|---|
+  | `s1` | Swipe-Sort: AI or Not AI? | `"1"` | — | complete |
+  | `s2` | AI History Timeline | `"1"` | — | in-progress, progress 40 |
+  | `s3` | Case Study: DeepMind & the NHS | `"1"` | — | in-progress, progress 0 |
+  | `s4` | Biased Dataset Sandbox | `"1"` | — | in-progress, progress 0 |
+  | `s5` | Hallucination Hunt | `"2"` | `s1`, `s2` | locked |
+  | `s6` | Prompt Lab | `"2"` | `s2`, `s3` | locked |
+  | `s7` | Case Study: Mata v. Avianca | `"2"` | `s4` | locked |
+  | `s8` | Build Your MVP Chatbot | `"3"` | `s5`, `s6` | locked |
+  | `s9` | Lean Canvas Workshop | `"3"` | `s6` | locked |
+  | `s10` | Record Your Pitch | `"3"` | `s7` | locked |
+
+  Give each skill a one-sentence, kid-friendly `description`.
+- **Starting XP:** `totalXp: 50`, so `levelProgress(50)` → level 1, 50 of 100.
+- Keep the current state in **one module-level variable** (it lives in memory and resets when the page reloads). Build it from a `createStartingState()` function, so that reset is easy.
+- Export:
+  - **`getMockProgress(): ProgressSnapshot`** returns a **deep copy** (`structuredClone(state)`). A copy matters: if the screens received the same object every time, React might not notice changes, and a real server always sends brand-new data.
+  - **`async mockFetchProgress(): Promise<ProgressSnapshot>`** waits `MOCK_DELAY_MS`, throws `new Error("Mock server is down")` if `MOCK_FORCE_ERROR`, otherwise returns `getMockProgress()`.
+  - **`simulateCompleteChallenge(skillId: string): boolean`** is DEV ONLY and pretends the learner just finished a skill:
+    1. Find the skill. If it's missing or not `"in-progress"`, change nothing and return `false`.
+    2. Set its status to `"complete"` and `progress` to 100.
+    3. Add its `xpReward` to `totalXp`, then set `level`, `xpIntoLevel` and `xpForNextLevel` from `levelProgress(totalXp)`.
+    4. **Unlock:** every `"locked"` skill whose prerequisites **all exist and are all complete** becomes `"in-progress"` with `progress` 0. A prerequisite id that doesn't exist keeps the skill locked.
+    5. Return `true`.
+  - **`resetMockProgress()`** puts everything back to the starting state.
+
+**4. `api/progressApi.ts`** — **the only file in Step 5 that talks to the backend.** Use this code; read every comment:
+```ts
+import type { ProgressSnapshot, Skill, SkillStatus } from "@/types/progress";
+import { levelProgress } from "@/utils/levels";
+import { mockFetchProgress } from "./mockProgress";
+
+// Mock or real? Read the env WHEN CALLED (not at the top of the file), so tests
+// can change it. Same rule as api/submissionApi.ts.
+function shouldUseMock(): boolean {
+  return process.env.NEXT_PUBLIC_USE_MOCK === "true" || !process.env.NEXT_PUBLIC_API_URL;
+}
+
+// ASSUMPTION - confirm with Backend (SYNC 4). Today /progress/me sends total_xp,
+// level, xp_to_next_level, badges and certificates, but NO skills yet.
+type RawSkill = {
+  id: number;
+  name: string;
+  description: string;
+  module_id: number;
+  status: SkillStatus;
+  prerequisites: number[];
+  xp_reward: number;
+  progress?: number;
+};
+type RawProgress = { total_xp: number; skills?: RawSkill[] };
+
+// Mapper: backend snake_case + number ids → our camelCase + string ids.
+function toSkill(raw: RawSkill): Skill {
+  return {
+    id: String(raw.id),
+    name: raw.name,
+    description: raw.description,
+    moduleId: String(raw.module_id),
+    status: raw.status,
+    prerequisites: raw.prerequisites.map(String),
+    xpReward: raw.xp_reward,
+    progress: raw.progress,
+  };
+}
+
+function toSnapshot(raw: RawProgress): ProgressSnapshot {
+  // The backend sends "XP still needed"; our bar needs "XP into the level" and
+  // "level size", so we work them out from total XP with the backend's own thresholds.
+  const { level, xpIntoLevel, xpForNextLevel } = levelProgress(raw.total_xp);
+  return {
+    totalXp: raw.total_xp,
+    level,
+    xpIntoLevel,
+    xpForNextLevel,
+    // No skills from the backend yet → an empty map instead of a crash.
+    skills: raw.skills ? raw.skills.map(toSkill) : [],
+  };
+}
+
+// `async` means this function may need to wait; `await` pauses until the answer arrives.
+export async function fetchProgress(token?: string | null): Promise<ProgressSnapshot> {
+  if (shouldUseMock()) return mockFetchProgress();
+
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/progress/me`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  // A brand-new learner has no progress row yet: show zero progress, not an error.
+  if (res.status === 404) return toSnapshot({ total_xp: 0 });
+  if (!res.ok) throw new Error("Could not load progress");
+
+  return toSnapshot((await res.json()) as RawProgress);
+}
+```
+
+**5. `hooks/useProgressPolling.ts`** — keeps progress fresh: fetches now, then every few seconds. Use this code exactly. It passes our lint rule because state is only set **after** an `await`, never directly in the effect body:
+```ts
+"use client";
+
+import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { fetchProgress } from "@/api/progressApi";
+import type { ProgressSnapshot } from "@/types/progress";
+
+// How often to ask for fresh progress. Set NEXT_PUBLIC_POLL_INTERVAL_MS to change it.
+export const DEFAULT_POLL_MS = Number(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS) || 5000;
+
+// Fetches progress now, then every `intervalMs`, but only while the tab is visible.
+// Changing `refreshKey` fetches again straight away ("Try again" and Task 20's
+// WebSocket use this).
+export function useProgressPolling(intervalMs: number = DEFAULT_POLL_MS, refreshKey = 0) {
+  const { getToken } = useAuth();
+  const [data, setData] = useState<ProgressSnapshot | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Becomes true when the page goes away, so late answers are ignored.
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | undefined;
+
+    async function load() {
+      try {
+        const token = await getToken(); // the logged-in learner's Clerk token (null in mock mode is fine)
+        const snapshot = await fetchProgress(token);
+        if (cancelled) return;
+        setData(snapshot);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        // Keep the old data on screen; just remember the error.
+        setError(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    function start() {
+      void load(); // fetch now...
+      timer = setInterval(() => void load(), intervalMs); // ...then again every intervalMs
+    }
+
+    function stop() {
+      if (timer) clearInterval(timer);
+      timer = undefined;
+    }
+
+    // Pause while the tab is hidden; fetch straight away when it comes back.
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") stop();
+      else if (!timer) start();
+    }
+
+    if (document.visibilityState !== "hidden") start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // CLEANUP: stop the timer and the listener when the page goes away.
+    // Forgetting this keeps polling forever in the background.
+    return () => {
+      cancelled = true;
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [intervalMs, refreshKey, getToken]);
+
+  return { data, error, loading };
+}
+```
+
+**6. `app/components/progress/DevSimulator.tsx`** — a **DEV ONLY** panel to trigger changes by hand.
+- `"use client"`, default export, no props.
+- Renders **nothing** unless `process.env.NODE_ENV === "development"` **and** `process.env.NEXT_PUBLIC_USE_MOCK === "true"`.
+- A dashed coral-bordered box labelled **"DEV ONLY"**, containing:
+  - a `<select>` labelled "Skill to complete", listing the **in-progress** skills from `getMockProgress()`;
+  - a button "Simulate: complete challenge" that calls `simulateCompleteChallenge(selectedId)`;
+  - a line under the button. After a successful click it reads "Done! The page updates on the next poll (within 5 seconds)."; if the call returned false, it reads "That skill can't be completed right now."
+- After a click, increase a small `version` counter in state so the dropdown re-reads the in-progress list.
+- It changes the mock **directly**. The page doesn't update until the next poll, which is exactly how the real backend will behave.
+
+**7. `app/dev/progress-test/page.tsx`** — `"use client"` dev page, heading "Progress Test", cream background:
+- uses `useProgressPolling()` and shows `loading`, the error message (if any) and the snapshot as formatted JSON in a `<pre>`;
+- shows `<DevSimulator />`;
+- has a "Reset mock" button that calls `resetMockProgress()`.
+
+**8. `.env.example`** — under the existing names, add these (no values):
+```
+NEXT_PUBLIC_WS_URL=
+NEXT_PUBLIC_POLL_INTERVAL_MS=
+```
+Also add `NEXT_PUBLIC_USE_MOCK=` if it isn't there yet; Step 4 may have added it already. In your local `.env`, set `NEXT_PUBLIC_USE_MOCK=true` and leave `NEXT_PUBLIC_WS_URL` empty. Restart `npm run dev` after editing `.env`.
+
+### Tests to write
+**`utils/levels.test.ts`**
+1. `levelProgress(0)` → `{ level: 1, xpIntoLevel: 0, xpForNextLevel: 100 }`.
+2. `50` → level 1, 50, 100. `100` → level 2, 0, 150. `260` → level 3, 10, 250.
+3. `1200` → level 5, 200, 0 (max level). `-5` → level 1, 0, 100.
+
+**`api/mockProgress.test.ts`** — call `resetMockProgress()` before each test.
+1. Starting state: 10 skills; `s1` complete; `s2`, `s3`, `s4` in-progress; the rest locked; `totalXp` 50, `level` 1.
+2. `getMockProgress()` returns a copy: changing the returned object doesn't change the next `getMockProgress()`.
+3. `simulateCompleteChallenge("s2")` returns true. Then:
+   - `s2` is complete;
+   - `totalXp` is 100, `level` 2, `xpIntoLevel` 0 and `xpForNextLevel` 150;
+   - `s5` is now in-progress, because both `s1` and `s2` are complete;
+   - `s6` is still locked, because `s3` isn't complete.
+4. `simulateCompleteChallenge("s5")` while `s5` is locked → returns false, nothing changes. Same for an unknown id.
+5. `mockFetchProgress()` with fake timers: not resolved after `MOCK_DELAY_MS - 1` ms, resolved after 1 more.
+
+**`api/progressApi.test.ts`** — mock `./mockProgress` (`mockFetchProgress` as a `vi.fn`), spy on `globalThis.fetch`, `vi.unstubAllEnvs()` after each test.
+1. With `NEXT_PUBLIC_USE_MOCK` stubbed `"true"` → `mockFetchProgress` called, `fetch` not called.
+2. Real mode: stub `NEXT_PUBLIC_USE_MOCK` to `""` and `NEXT_PUBLIC_API_URL` to `"http://api.test"`. `fetch` resolves `{ ok: true, status: 200, json: async () => ({ total_xp: 260, level: 3, xp_to_next_level: 240 }) }`. Then `fetchProgress("tok")`:
+   - calls `http://api.test/progress/me` with header `Authorization: Bearer tok`;
+   - returns `{ totalXp: 260, level: 3, xpIntoLevel: 10, xpForNextLevel: 250, skills: [] }`.
+3. Real mode, a response with one raw skill `{ id: 4, module_id: 1, prerequisites: [1, 2], xp_reward: 50, ... }` → mapped to `id: "4"`, `moduleId: "1"`, `prerequisites: ["1", "2"]`, `xpReward: 50`.
+4. Real mode, status 404 → zero progress: `totalXp` 0, level 1, `skills` `[]`.
+5. Real mode, `{ ok: false, status: 500 }` → rejects with "Could not load progress".
+
+**`hooks/useProgressPolling.test.ts`**
+- **Mocks:**
+  - `vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ getToken }) }))` with `const getToken = vi.fn(async () => "test-token")` created **outside** (so it stays stable);
+  - `vi.mock("@/api/progressApi", () => ({ fetchProgress: vi.fn() }))`.
+- **Timers:** use fake timers.
+- **Tests:**
+  1. Fetches immediately: after the first resolve, `data` is set and `loading` is false.
+  2. Fetches again after `intervalMs` (e.g. 1000): 2 calls after advancing 1000 ms, 3 after 2000 ms.
+  3. **Cleanup:** after `unmount()`, advancing 5000 ms makes no new calls.
+  4. **Keeps old data on error:** the first call resolves a snapshot, the second rejects → `data` is still the first snapshot and `error` is set.
+  5. **Pauses when hidden:**
+     - set `document.visibilityState` to `"hidden"` (`Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })`) and dispatch `visibilitychange` → advancing time makes no new calls;
+     - set it back to `"visible"` and dispatch again → one immediate call.
+  6. Changing `refreshKey` (via `rerender`) fetches immediately.
+
+### Done when
+1. `npx vitest run`: your 4 test files pass. `npx tsc --noEmit` and `npm run lint` are clean.
+2. http://localhost:3000/dev/progress-test shows the snapshot JSON after a short moment.
+3. Choose "AI History Timeline" in the DEV ONLY panel and click "Simulate: complete challenge" → within 5 seconds the JSON shows `totalXp` 100, `level` 2, and "Hallucination Hunt" is now `in-progress`, **without refreshing**.
+4. "Reset mock" puts everything back.
+5. Set `MOCK_FORCE_ERROR = true` locally → the error message shows (set it back, don't commit it).
+6. Switch to another browser tab for 20 seconds and come back → polling paused and then fetched straight away. Add a temporary `console.log("polling...")` in `load()` to see it, then remove it.
+
+### Must-have vs polish
+- **Must-have:** everything in "What to build", the 4 test files, the dev page.
+- **Polish (only if time left; a later small PR):**
+  - show "last updated 3 seconds ago" on the dev page;
+  - a second simulator button "Simulate: add 30 XP" (add an `simulateAddXp(amount)` to the mock).
+
+### Definition of Done
+- [ ] SYNC 4 request sent; Backend's answer (or "no answer yet") is in the PR description
+- [ ] `types/progress.ts` and `utils/levels.ts` match the code above; status words written only in the types file
+- [ ] `progressApi.ts` is the only Step 5 file that calls `fetch` or the mock fetch; real shapes marked `ASSUMPTION`
+- [ ] Mock starts with the 10 seeded skills; simulate unlocks the right skills and levels up at 100 XP
+- [ ] Polling hook cleans up, pauses on hidden tabs, keeps old data on error
+- [ ] DevSimulator renders only in development + mock mode
+- [ ] Committed with `MOCK_FORCE_ERROR = false`; `.env.example` names only; no `.env` committed
+- [ ] 4 test files pass; type check and lint clean
+- [ ] `/dev/progress-test` kept
+- [ ] PR merged and "Task 18 is on main" posted
+
+---
+
+
+
+
+
+
+
+
+
+## TASK 19 — Skill Map + Progress Dashboard Visuals
+
+**Order:** 2 of 3 in Step 5. **Starts:** when Task 18 is merged to `main`.
+**Owner:** ____________
+**Branch:** `feature/step5-task19-skill-map-dashboard`
+**Depends on:** Task 18 (`types/progress.ts`, `useProgressPolling`, `DevSimulator`).
+**Next:** Task 20 starts when your PR is merged. Post "Task 19 is on main" in the team channel.
+**Estimated time:** about 18 hours (skill card + map ≈ 7h, XP bar + dashboard ≈ 6h, pages ≈ 5h).
+**Checkpoints:**
+- **End of day 1:** `computeTiers`, `SkillNode`, `SkillMap` with tests green.
+- **End of day 2:** `XpBar` + `ProgressDashboard` with tests green, `/skill-map` working.
+- **Middle of day 3:** `/dashboard` wired, PR open.
+
+> **Prepare while you wait for Task 18:**
+> - Read this whole task.
+> - Review Task 18's PR (you're its reviewer); look closely at `types/progress.ts`, the mock skills table and `useProgressPolling`, because you'll use them all day.
+> - Write down your test cases.
+> - Open `app/dashboard/page.tsx` and find the two hard-coded spots you'll replace (the header XP pill and the "Level status card").
+
+### Goal
+Make progress **visible**:
+- a skill card with three clearly different states;
+- a tiered **Skill Map**;
+- an animated **XP bar**;
+- a **Progress Dashboard** card.
+
+Then put them on a new `/skill-map` page, and into the existing `/dashboard` in place of its hard-coded numbers.
+
+### Files you use but don't edit (from Task 18)
+- `@/types/progress`:
+  - `SkillStatus` = `"locked" | "in-progress" | "complete"`;
+  - `Skill` = `{ id, name, description, moduleId, status, prerequisites: string[], xpReward, progress? }`;
+  - `ProgressSnapshot` = `{ totalXp, level, xpIntoLevel, xpForNextLevel, skills }`.
+- `@/hooks/useProgressPolling`: `useProgressPolling(intervalMs?, refreshKey?)` returns `{ data: ProgressSnapshot | null; error: Error | null; loading: boolean }`. Changing `refreshKey` fetches again straight away. Also exports `DEFAULT_POLL_MS`.
+- `app/components/progress/DevSimulator.tsx`: `<DevSimulator />` (DEV ONLY; shows nothing outside development + mock mode).
+
+### Files to create / change
+```
+utils/computeTiers.ts
+utils/computeTiers.test.ts
+app/components/progress/SkillNode.tsx
+app/components/progress/SkillNode.test.tsx
+app/components/progress/SkillMap.tsx
+app/components/progress/SkillMap.test.tsx
+app/components/progress/XpBar.tsx
+app/components/progress/XpBar.test.tsx
+app/components/progress/ProgressDashboard.tsx
+app/components/progress/ProgressDashboard.test.tsx
+app/components/progress/SkillMapScreen.tsx
+app/components/progress/SkillMapScreen.test.tsx
+app/skill-map/page.tsx
+app/dashboard/page.tsx                         (change: two hard-coded spots only)
+```
+
+### What to build
+
+**1. `utils/computeTiers.ts`** — a **pure function** `computeTiers(skills: Skill[]): Skill[][]` that groups skills into tiers (rows).
+- A skill's tier is `1 + the highest tier among its prerequisites`, or 1 if it has none.
+- **Missing prerequisites** (an id not in the list) are ignored.
+- **Cycles** (A needs B, B needs A) must not loop forever. Keep a "visiting" set; if you meet a skill you're already visiting, treat that link as tier 0.
+- Return the tiers in order (tier 1 first). Inside a tier, keep the skills in their original order. Every skill appears exactly once.
+
+**2. `SkillNode.tsx`** — `"use client"`, default export, props `{ skill: Skill; requires?: string[]; onSelect?: (skill: Skill) => void }`. `requires` holds the **names** of the missing prerequisites.
+- **Labels:** keep one lookup `const STATUS_LABEL: Record<SkillStatus, string> = { locked: "Locked", "in-progress": "In progress", complete: "Complete" }`. Never write the status words anywhere else.
+- **Every state shows the skill name (bold, `break-words`), the description (small), and a text label**, so colour is never the only signal:
+
+  | Status | Look | Extra text | Element |
+  |---|---|---|---|
+  | `complete` | `bg-tealpop`, card look | "✓ Complete" and "+{xpReward} XP" | `<button>` |
+  | `in-progress` | `bg-white`, card look, coral progress bar (`h-2`, ink border) filled to `progress ?? 0`% | "In progress" and "{progress}% done" | `<button>` |
+  | `locked` | `bg-white opacity-60`, `text-taskgray`, dashed ink border | "🔒 Locked" and "Requires: {names joined with ', '}", or "Finish earlier skills first" if `requires` is empty | `<div>`: **not** a button, so it can't be clicked or reached with Tab |
+
+- Clickable states use `motion.button` (from `motion/react`) with `type="button"`, `whileHover={{ scale: 1.03 }}`, `whileTap={{ scale: 0.97 }}`, `aria-label` "Skill: {name}, {Complete | In progress}", and `onClick={() => onSelect?.(skill)}`.
+
+**3. `SkillMap.tsx`** — default export, props `{ skills: Skill[]; onSelectSkill?: (skill: Skill) => void }`.
+- Uses `computeTiers(skills)`. Each tier is a `<section>` with a small heading "Tier {n}" (`font-display`, bold) and its nodes in a grid: 1 column on phones, 2 from `sm`, 3 from `lg`.
+- For a locked skill, pass `requires`: the names of its prerequisites that aren't complete. Skip ids that don't exist.
+- If `skills` is empty, show "Your skills will appear here soon." instead.
+
+**4. `XpBar.tsx`** — `"use client"`, default export, props `{ current: number; max: number }`.
+- `percent = max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 100`. Never NaN; at the max level (`max` 0) the bar is full.
+- An outer bar: `h-4 w-full overflow-hidden rounded-full border-2 border-ink bg-white`, with:
+  - `role="progressbar"`;
+  - `aria-label="XP progress to the next level"`;
+  - `aria-valuemin={0}`, `aria-valuemax={100}`, `aria-valuenow={Math.round(percent)}`.
+- The inner fill is a `motion.div` with `bg-tealpop` and `animate={{ width: \`${percent}%\` }}` (`transition={{ duration: 0.6, ease: "easeOut" }}`), so it **grows smoothly** when XP changes.
+- The text under the bar is "{current} / {max} XP", or "Max level!" when `max` is 0.
+
+**5. `ProgressDashboard.tsx`** — default export, props `{ snapshot: ProgressSnapshot }`. Card look, containing:
+- A "Level {level}" pill (`bg-tealpop`, ink border, `font-display`) and "{totalXp} XP total".
+- `<XpBar current={snapshot.xpIntoLevel} max={snapshot.xpForNextLevel} />`.
+- **Derived data:** calculate counts from `snapshot.skills`; never store them.
+  - "{completed} of {total} skills complete".
+  - "Keep going:" followed by a list of up to 3 in-progress skill names, or "Nothing in progress right now." if there are none.
+  - If `skills` is empty (real backend, no skills yet), show "Skills will appear here soon." instead of these two lines.
+
+**6. `SkillMapScreen.tsx`** — `"use client"`, default export, no props. The whole `/skill-map` page body.
+- Keep `refreshKey` in state (starts 0) and call `useProgressPolling(DEFAULT_POLL_MS, refreshKey)`.
+- Layout: `<main>` with cream background and a centred column (`max-w-5xl`, padding):
+  - a link "← Back to dashboard" → `/dashboard`;
+  - `<h1>` "Skill Map";
+  - then, depending on the state:
+
+    | State | Shows |
+    |---|---|
+    | Loading with no data | "Getting your skill map ready..." in a `role="status"` box |
+    | Error with no data | A coral-bordered `role="alert"` box: "We could not load your skill map." plus a "Try again" button that increases `refreshKey` |
+    | Error but old data | The map, plus a small grey note "Having trouble updating. Showing your last progress." |
+    | Data | `<SkillMap skills={data.skills} onSelectSkill={...} />` |
+
+  - `<DevSimulator />` at the bottom.
+- Clicking a skill: `router.push(\`/module/${skill.moduleId}\`)` (`useRouter` from `next/navigation`). That's Step 4's module hub; a 404 until Step 4 merges is expected.
+
+**7. `app/skill-map/page.tsx`** — a tiny server page:
+```tsx
+import SkillMapScreen from "@/app/components/progress/SkillMapScreen";
+
+export default function SkillMapPage() {
+  return <SkillMapScreen />;
+}
+```
+`/skill-map` isn't in `proxy.ts`'s public list, so you must **sign in** to open it. Don't edit `proxy.ts`.
+
+**8. `app/dashboard/page.tsx`** — **change only these spots**, and keep everything else UI/UX built (the level grid, mascot spotlight, links, styling):
+1. **Remove** the hard-coded `const [userXp] = useState(50);`, `const totalXpRequired = 100;` and `const progressPercent = ...` lines.
+2. **Add** `const { data: progress, loading: progressLoading, error: progressError } = useProgressPolling();`.
+3. **Header XP pill** (the one showing `{userXp} XP`): show `{progress ? progress.totalXp : "…"} XP`.
+4. **Replace the whole "Level status card"** (the `div` with `min-w-[260px]` containing "Level 1: Novice", the fake bar and "Earn 50 more XP…") with a `div` of the same width containing:
+   - while loading with no data: "Loading your progress...";
+   - an error with no data: a coral-bordered box "We could not load your progress. Please refresh the page.";
+   - data: `<ProgressDashboard snapshot={progress} />` and below it a small link "View skill map →" → `/skill-map`.
+5. Add `<DevSimulator />` at the very bottom of `<main>`.
+
+   `useState` may no longer be needed for XP, but `userName` still uses it; keep that.
+
+**`/dashboard` is public** in `proxy.ts`. In real mode, a logged-out visitor gets the friendly error box, which is fine. In mock mode it always works.
+
+### Tests to write
+**`utils/computeTiers.test.ts`**
+1. With the 10 mock skills (build them in the test, or import `getMockProgress` from `@/api/mockProgress`) → tier sizes `[4, 3, 3]`; tier 2 is s5, s6, s7.
+2. A skill whose prerequisite id doesn't exist → tier 1, no crash.
+3. A cycle (`a` needs `b`, `b` needs `a`) → returns without hanging, and both skills appear exactly once.
+4. Order inside a tier is kept.
+
+**`SkillNode.test.tsx`** — mock nothing; it imports only `motion/react` and types.
+1. Complete → a button named "Skill: {name}, Complete", the text "+50 XP".
+2. In-progress with `progress: 40` → a button named "Skill: {name}, In progress", text "40% done".
+3. Locked with `requires={["Swipe-Sort: AI or Not AI?"]}` → **no button**, text "Locked" and "Requires: Swipe-Sort: AI or Not AI?".
+4. Clicking a clickable node calls `onSelect` with the skill.
+
+**`SkillMap.test.tsx`**
+1. The 10 mock skills → headings "Tier 1", "Tier 2", "Tier 3"; 4 buttons (the 4 unlocked tier-1 skills) and 6 non-clickable locked cards.
+2. `[]` → "Your skills will appear here soon.".
+
+**`XpBar.test.tsx`**
+1. `current 50, max 100` → progressbar `aria-valuenow` "50", text "50 / 100 XP".
+2. `current 150, max 100` → `aria-valuenow` "100" (clamped).
+3. `current 200, max 0` → `aria-valuenow` "100", text "Max level!", and no "NaN" anywhere.
+
+**`ProgressDashboard.test.tsx`**
+1. Snapshot with level 2, totalXp 100, 3 of 10 complete, 2 in-progress → "Level 2", "100 XP total", "3 of 10 skills complete", both in-progress names.
+2. No in-progress skills → "Nothing in progress right now.".
+3. `skills: []` → "Skills will appear here soon.".
+
+**`SkillMapScreen.test.tsx`** — mock `@/hooks/useProgressPolling` (`useProgressPolling` as a `vi.fn`, plus `DEFAULT_POLL_MS: 5000`), `next/navigation` (`useRouter: () => ({ push })`) and `@/app/components/progress/DevSimulator` (renders nothing).
+1. Loading, no data → "Getting your skill map ready...".
+2. Error, no data → "We could not load your skill map."; clicking "Try again" re-renders and `useProgressPolling` was last called with `refreshKey` 1.
+3. Data → "Skill Map" heading and "Tier 1"; clicking an unlocked skill calls `push` with `/module/1`.
+4. Error **and** data → the map plus "Having trouble updating. Showing your last progress.".
+
+### Done when
+1. `npx vitest run`: your 6 test files pass (plus Task 18's). `npx tsc --noEmit` and `npm run lint` are clean.
+2. Signed in, http://localhost:3000/skill-map shows 10 skills in 3 tiers:
+   - one complete (teal ✓);
+   - three in progress (bars);
+   - six locked (faded, "Requires: …").
+3. Tab moves only between the 4 clickable skills; locked ones are skipped.
+4. In the DEV ONLY panel, complete "AI History Timeline" → within 5 seconds, without refreshing, "Hallucination Hunt" turns from Locked to In progress.
+5. http://localhost:3000/dashboard shows the live XP in the header, the Progress Dashboard card in place of the old "Level 1: Novice" card, and a working "View skill map →" link. Simulating a completion makes the bar **grow smoothly** within 5 seconds, and the level goes 1 → 2 at 100 XP.
+6. The rest of the dashboard (level grid, mascot spotlight, links) looks exactly as before.
+7. Check the screens in greyscale (DevTools → Rendering → "Emulate vision deficiencies"): the three states are still clearly different. At 375px nothing overflows.
+
+### Must-have vs polish
+- **Must-have:** items 1–8 of "What to build", the 6 test files and the "Done when" checks.
+- **Polish (only if time left; a later small PR):**
+  - drawn connector lines (SVG) between prerequisites and skills;
+  - a "count-up" animation for total XP;
+  - a tooltip on locked skills.
+
+### Definition of Done
+- [ ] Three skill states differ by text **and** colour; locked skills aren't focusable
+- [ ] `computeTiers` handles missing prerequisites and cycles (tested)
+- [ ] XP bar animates, never shows NaN, has `role="progressbar"`
+- [ ] Completed / in-progress counts are derived from `skills`, never stored
+- [ ] `/dashboard` shows live XP and the Progress Dashboard; nothing else on it changed
+- [ ] 6 test files pass; type check and lint clean
+- [ ] PR merged and "Task 19 is on main" posted
+
+---
+
+
+
+
+
+
+
+
+
+## TASK 20 — Live Updates + Unlock Celebration
+
+**Order:** 3 of 3 in Step 5. **Starts:** when Task 19 is merged to `main`.
+**Owner:** ____________
+**Branch:** `feature/step5-task20-live-unlocks`
+**Depends on:** Task 18 (types, `useProgressPolling`) and Task 19 (`SkillMapScreen`, the wired `/dashboard`).
+**Next:** the FINAL team check. Post "Task 20 is on main" in the team channel.
+**Estimated time:** about 18 hours (unlock detection + celebration ≈ 7h, WebSocket ≈ 7h, combined hook + wiring ≈ 4h). The two tricky hooks are given as code.
+**Checkpoints:**
+- **End of day 1:** `findUnlocks`, `useUnlockDetector`, `UnlockCelebration` with tests green.
+- **End of day 2:** `useProgressSocket` + `useLiveProgress` with tests green.
+- **Middle of day 3:** both pages switched, PR open.
+
+> **Prepare while you wait for Task 19:**
+> - Read this whole task.
+> - Review Task 19's PR (you're its reviewer), especially `SkillMapScreen` and the `/dashboard` changes, because you'll edit both.
+> - Write down your test cases.
+> - Open `backend/realtime/notify.py` to see the two messages the real WebSocket sends.
+
+### Goal
+Make it feel **alive**:
+- When new data arrives and a skill has just unlocked (or the learner levelled up), **Spark celebrates, exactly once**. It never celebrates on page load, never repeats, and queues if two things happen at once.
+- Connect to the backend's **WebSocket**, so updates arrive **instantly** instead of within 5 seconds, with polling as the safety net.
+
+### How the WebSocket is used (read this first)
+The backend's `/ws` doesn't send full progress. It sends small events (`level_up`, `badge_unlocked`), and nothing at all for plain XP gains. So we treat the socket as a **doorbell**:
+- **Any message** → fetch fresh progress **right now**. This works by changing the polling hook's `refreshKey`.
+- **While the socket is open**, polling slows to every **30 seconds** instead of stopping, so XP gains the socket doesn't announce still arrive.
+- **If the socket is closed**, or there is no `NEXT_PUBLIC_WS_URL` (mock mode), polling runs at the normal speed.
+
+The pages and visuals don't change at all. They just call `useLiveProgress()` instead of `useProgressPolling()`.
+
+### Files you use but don't edit
+- From Task 18:
+  - `@/types/progress` (`Skill`, `ProgressSnapshot`);
+  - `@/hooks/useProgressPolling` (`useProgressPolling(intervalMs?, refreshKey?)` → `{ data, error, loading }`, plus `DEFAULT_POLL_MS`).
+- `app/components/mascots/SparkCard.tsx`: default export, props `{ message: string; onDismiss: () => void }`. It shows a "Dismiss Spark" button. **Don't edit it.**
+
+### Files to create / change
+```
+utils/findUnlocks.ts
+utils/findUnlocks.test.ts
+hooks/useUnlockDetector.ts
+hooks/useUnlockDetector.test.ts
+app/components/progress/UnlockCelebration.tsx
+app/components/progress/UnlockCelebration.test.tsx
+hooks/useProgressSocket.ts
+hooks/useProgressSocket.test.ts
+hooks/useLiveProgress.ts
+hooks/useLiveProgress.test.ts
+app/components/progress/SkillMapScreen.tsx      (change: switch hook + add celebration; listed exception, Task 19's file)
+app/components/progress/SkillMapScreen.test.tsx (change: mock useLiveProgress instead of useProgressPolling)
+app/dashboard/page.tsx                          (change: switch hook + add celebration)
+```
+
+### What to build
+
+**1. `utils/findUnlocks.ts`** — a pure function that compares two snapshots.
+- Export `type Celebration = { id: string; message: string }`.
+- Export `findUnlocks(prev: ProgressSnapshot, next: ProgressSnapshot): Celebration[]`:
+  1. If `next.level > prev.level`, the **first** item is `{ id: \`level-${next.level}\`, message: \`Level up! You reached level ${next.level}!\` }`.
+  2. Then, for every skill in `next` whose **previous** status was `"locked"` and whose new status is `"in-progress"` or `"complete"`, add `{ id: \`skill-${skill.id}\`, message: \`You unlocked ${skill.name}!\` }`, in the order of `next.skills`.
+  3. Anything else (same data, in-progress → complete, a skill that didn't exist before) adds nothing.
+
+**2. `hooks/useUnlockDetector.ts`** — remembers the previous snapshot and queues celebrations. Use this code exactly. It compares **during render**, which is React's recommended way to react to a changed value without an effect, so it passes our lint rule:
+```ts
+"use client";
+
+import { useState } from "react";
+import type { ProgressSnapshot } from "@/types/progress";
+import { findUnlocks, type Celebration } from "@/utils/findUnlocks";
+
+// Watches progress snapshots and returns the celebration to show right now.
+// - The FIRST snapshot never celebrates (otherwise every page load would replay old unlocks).
+// - The same celebration id never fires twice.
+// - Several at once are queued and shown one after another.
+export function useUnlockDetector(snapshot: ProgressSnapshot | null) {
+  const [previous, setPrevious] = useState<ProgressSnapshot | null>(null);
+  const [queue, setQueue] = useState<Celebration[]>([]);
+  const [seenIds, setSeenIds] = useState<string[]>([]);
+
+  // A new snapshot arrived: compare it with the one before.
+  if (snapshot !== previous) {
+    setPrevious(snapshot);
+    if (previous && snapshot) {
+      const fresh = findUnlocks(previous, snapshot).filter((c) => !seenIds.includes(c.id));
+      if (fresh.length > 0) {
+        setQueue((q) => [...q, ...fresh]);
+        setSeenIds((ids) => [...ids, ...fresh.map((c) => c.id)]);
+      }
+    }
+  }
+
+  // Removes a celebration once the learner dismisses it, so the next one shows.
+  function dismiss(id: string) {
+    setQueue((q) => q.filter((c) => c.id !== id));
+  }
+
+  return { current: queue[0] ?? null, dismiss };
+}
+```
+
+**3. `UnlockCelebration.tsx`** — `"use client"`, default export, props `{ celebration: Celebration | null; onDismiss: (id: string) => void }`.
+- If `celebration` is null, render nothing.
+- Otherwise render a fixed container at the bottom of the screen (`fixed inset-x-4 bottom-4 z-40 mx-auto max-w-md`) with `aria-live="polite"`, holding `<SparkCard key={celebration.id} message={celebration.message} onDismiss={() => onDismiss(celebration.id)} />`. The `key` makes each celebration a fresh Spark.
+- It sits **on top of** the page bottom, not over the skill cards' click targets, and it can always be dismissed.
+
+**4. `hooks/useProgressSocket.ts`** — the WebSocket connection. Use this code exactly; read every comment:
+```ts
+"use client";
+
+import { useEffect, useState } from "react";
+
+export type SocketStatus = "off" | "connecting" | "open" | "closed";
+
+const PING_MS = 25000; // keep-alive: the backend answers "ping" with "pong"
+const MAX_RETRY_MS = 30000;
+
+// Opens a WebSocket and counts the messages the server pushes.
+// `buildUrl` returns the full URL (with a fresh login token) or null.
+// Pass null instead of a function to switch the socket off (e.g. in mock mode).
+// `buildUrl` must be stable: wrap it in useCallback.
+export function useProgressSocket(buildUrl: (() => Promise<string | null>) | null) {
+  const [status, setStatus] = useState<SocketStatus>("connecting");
+  const [messageCount, setMessageCount] = useState(0);
+
+  useEffect(() => {
+    if (!buildUrl) return; // switched off
+    const getUrl = buildUrl;
+
+    let socket: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let pingTimer: ReturnType<typeof setInterval> | undefined;
+    let retryMs = 1000;
+    let stopped = false; // true after cleanup: never reconnect
+
+    async function connect() {
+      // Ask for the URL each time, so every reconnect uses a fresh token.
+      const url = await getUrl();
+      if (stopped) return;
+      if (!url) {
+        setStatus("closed");
+        return;
+      }
+
+      socket = new WebSocket(url);
+
+      // onopen: connected. Reset the retry delay and start the keep-alive ping.
+      socket.onopen = () => {
+        retryMs = 1000;
+        setStatus("open");
+        pingTimer = setInterval(() => socket?.send("ping"), PING_MS);
+      };
+
+      // onmessage: the server pushed something. "pong" is only the keep-alive reply;
+      // anything else is the doorbell: count it so progress gets fetched now.
+      socket.onmessage = (event: MessageEvent) => {
+        if (event.data === "pong") return;
+        setMessageCount((count) => count + 1);
+      };
+
+      // onclose: dropped or refused. Try again after a growing delay: 1s, 2s, 4s ... 30s.
+      // (Browsers fire onclose after onerror, so onclose alone is enough.)
+      socket.onclose = () => {
+        if (pingTimer) clearInterval(pingTimer);
+        if (stopped) return;
+        setStatus("closed");
+        retryTimer = setTimeout(() => {
+          setStatus("connecting");
+          void connect();
+        }, retryMs);
+        retryMs = Math.min(retryMs * 2, MAX_RETRY_MS);
+      };
+    }
+
+    void connect();
+
+    // CLEANUP: never reconnect, stop both timers, close the socket.
+    return () => {
+      stopped = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (pingTimer) clearInterval(pingTimer);
+      socket?.close();
+    };
+  }, [buildUrl]);
+
+  // Without a URL builder the socket is simply off.
+  return { status: buildUrl ? status : "off", messageCount };
+}
+```
+
+**5. `hooks/useLiveProgress.ts`** — the **one hook the pages use**. `"use client"`. Named export `useLiveProgress(refreshKey = 0)` returning `{ data, error, loading, mode }`, where `mode` is `"websocket" | "polling"`.
+1. Read `const wsBase = process.env.NEXT_PUBLIC_WS_URL;` and `const useMock = process.env.NEXT_PUBLIC_USE_MOCK === "true";`.
+2. Get `{ getToken, isSignedIn }` from `useAuth()`.
+3. `const buildUrl = useCallback(async () => { const token = await getToken(); return token ? \`${wsBase}?token=${encodeURIComponent(token)}\` : null; }, [getToken, wsBase]);`
+4. `const socket = useProgressSocket(!useMock && wsBase && isSignedIn ? buildUrl : null);`
+5. `const socketOpen = socket.status === "open";`
+6. `const polling = useProgressPolling(socketOpen ? 30000 : DEFAULT_POLL_MS, socket.messageCount + refreshKey);`
+7. `return { ...polling, mode: socketOpen ? "websocket" : "polling" };`
+
+**Both hooks are always called, in the same order.** Never write `if (wsBase) useProgressSocket(...)`: React requires hooks in the same order on every render.
+
+**6. Switch the pages** (one line each, plus the celebration):
+- **`SkillMapScreen.tsx`:**
+  - replace `useProgressPolling(DEFAULT_POLL_MS, refreshKey)` with `useLiveProgress(refreshKey)`;
+  - add `const { current, dismiss } = useUnlockDetector(data);`;
+  - render `<UnlockCelebration celebration={current} onDismiss={dismiss} />` at the end of `<main>`.
+- **`app/dashboard/page.tsx`:**
+  - replace `useProgressPolling()` with `useLiveProgress()`;
+  - add the same detector and `<UnlockCelebration>`.
+- Nothing else in either file changes.
+- **`SkillMapScreen.test.tsx`** (Task 19's test) now mocks the wrong hook:
+  - change its mock to `vi.mock("@/hooks/useLiveProgress", () => ({ useLiveProgress: vi.fn() }))`;
+  - make it return the same shapes, plus `mode: "polling"`;
+  - in test 2, check that `useLiveProgress` was last called with `1`.
+
+  The four test cases stay the same, and it must pass again.
+
+### Tests to write
+**`utils/findUnlocks.test.ts`**
+1. `s5` locked → in-progress → `[{ id: "skill-s5", message: "You unlocked Hallucination Hunt!" }]`.
+2. The same snapshot twice → `[]`.
+3. Level 1 → 2 plus one unlock → the level-up item first, then the skill.
+4. In-progress → complete (no unlock) → `[]`.
+
+**`hooks/useUnlockDetector.test.ts`** — use `renderHook(({ snap }) => useUnlockDetector(snap), { initialProps: { snap: first } })` and `rerender`.
+1. The first snapshot → `current` is null.
+2. Rerender with a snapshot where `s5` unlocked → `current.message` is "You unlocked Hallucination Hunt!".
+3. Rerender with an **identical copy** (`structuredClone`) of that snapshot → still only that one celebration; after `dismiss`, `current` is null.
+4. Two unlocks at once → `current` is the first; after `dismiss(first.id)`, `current` is the second.
+5. A skill that unlocks, goes back to locked, then unlocks again → celebrated only once.
+
+**`UnlockCelebration.test.tsx`** — mock `next/image` with a plain `<img>`.
+1. `celebration={null}` → renders nothing.
+2. Shows the message; clicking the button named "Dismiss Spark" calls `onDismiss` with the celebration's id.
+
+**`hooks/useProgressSocket.test.ts`** — fake timers. Replace the browser's WebSocket with a tiny fake class via `vi.stubGlobal("WebSocket", FakeWebSocket)`. Remember every created instance in an array, and give it:
+- a `url`;
+- `onopen`, `onmessage` and `onclose` properties;
+- `send = vi.fn()` and `close = vi.fn()`.
+
+Helper methods `open()`, `message(data)` and `drop()` call the matching handler. After `renderHook`, flush the async `buildUrl` with `await act(async () => {})`.
+1. `buildUrl` null → `status` "off" and no socket created.
+2. `buildUrl` resolving `"ws://test/ws?token=t"` → one socket with that url. After `open()`, status is "open".
+3. `message('{"type":"level_up"}')` → `messageCount` 1; `message("pong")` → still 1.
+4. `drop()` → status "closed". After advancing 1000 ms (and flushing), a **second** socket was created. A second `drop()` waits 2000 ms (backoff).
+5. `unmount()` → `close` was called. A later `drop()` + advancing 60 s creates **no** new socket.
+6. After `open()`, advancing 25 000 ms → `send` was called with `"ping"`.
+
+**`hooks/useLiveProgress.test.ts`** — mock `@clerk/nextjs` (`useAuth` returning a stable `getToken` and `isSignedIn: true`), `./useProgressPolling` (`useProgressPolling: vi.fn(() => ({ data: null, error: null, loading: true })), DEFAULT_POLL_MS: 5000`) and `./useProgressSocket` (`useProgressSocket: vi.fn()`). `vi.unstubAllEnvs()` after each test.
+1. Mock mode (`NEXT_PUBLIC_USE_MOCK` = `"true"`), the socket mock returning `{ status: "off", messageCount: 0 }` → `useProgressSocket` called with `null`; `useProgressPolling` called with `(5000, 0)`; `mode` "polling".
+2. Real mode (`NEXT_PUBLIC_USE_MOCK` = `""`, `NEXT_PUBLIC_WS_URL` = `"ws://test/ws"`), socket `{ status: "open", messageCount: 3 }` → `useProgressSocket` called with a function; `useProgressPolling` called with `(30000, 3)`; `mode` "websocket".
+3. Real mode, socket `{ status: "closed", messageCount: 0 }` → polling at 5000; `mode` "polling".
+
+### Done when
+1. `npx vitest run`: your 5 test files pass (plus Tasks 18 and 19's). `npx tsc --noEmit` and `npm run lint` are clean.
+2. Signed in, mock mode, on `/skill-map`:
+   - Complete "AI History Timeline" in the DEV ONLY panel. Within 5 seconds the map updates and **Spark celebrates twice in a row**: "Level up! You reached level 2!", then (after you dismiss it) "You unlocked Hallucination Hunt!".
+   - Wait 30 seconds → no repeat.
+   - **Refresh the page → no celebration** for old unlocks. (The mock resets on reload; that's fine.)
+3. The same on `/dashboard`: the bar grows and Spark celebrates once.
+4. Refresh the page (it resets the mock), complete "AI History Timeline" and dismiss its celebrations. Then quickly complete "Case Study: DeepMind & the NHS" and "Biased Dataset Sandbox" → "You unlocked Prompt Lab!" and "You unlocked Case Study: Mata v. Avianca!" show **one after another**.
+5. Navigate away from the page → the polling stops (check with a temporary `console.log`, then remove it).
+6. **Optional, real backend:** if you can run the backend locally (`http://127.0.0.1:8000`) and are signed in, set `NEXT_PUBLIC_WS_URL=ws://127.0.0.1:8000/ws`, `NEXT_PUBLIC_USE_MOCK=false` and restart.
+   - DevTools → Network → WS shows the socket **connected**.
+   - Stop the backend → the socket retries with growing gaps.
+   - Start it again → it reconnects.
+
+   `/progress/me` itself will fail until Backend adds CORS. That's expected; it's in the SYNC 4 request.
+
+### Must-have vs polish
+- **Must-have:** items 1–6 of "What to build", the 5 test files and "Done when" checks 1–5.
+- **Polish (only if time left; a later small PR):**
+  - a small "Live" / "Reconnecting…" pill showing `mode`;
+  - remember celebrated ids in `localStorage`, so even a refresh after a real unlock never repeats one;
+  - a celebration for `badge_unlocked` messages ("You earned the {badge name} badge!").
+
+### Definition of Done
+- [ ] Celebrates once per unlock / level-up, never on first load, queued when several happen at once
+- [ ] Pages call **one** hook (`useLiveProgress`); visual components contain no fetching or socket code
+- [ ] The socket reconnects with backoff, pings, and fully cleans up; the hooks are called unconditionally
+- [ ] Polling keeps working (slower) while the socket is open, and normally when it isn't
+- [ ] Mascot files untouched
+- [ ] 5 test files pass; type check and lint clean
+- [ ] PR merged and "Task 20 is on main" posted
+
+---
+
+## FINAL — Step 5 Team Check (all three of you, after Task 20 is merged)
+
+Done **together**. It is not one person's job.
+1. Everyone pulls `main` and runs `npm install`.
+2. `npx vitest run` → all 15 Step 5 test files pass, along with everything else. `npx tsc --noEmit`, `npm run lint` and `npm run build` are clean.
+3. Search the project for `fetch(`: in Step 5 code it should appear only in `api/progressApi.ts`. Search for `new WebSocket`: only in `hooks/useProgressSocket.ts`.
+4. `/dev/progress-test` still works.
+5. Together, signed in, mock mode:
+   1. `/dashboard`: live XP in the header and the Progress Dashboard card; the rest of UI/UX's page is unchanged.
+   2. Click "View skill map →": 10 skills, 3 tiers, three clearly different states (also in greyscale).
+   3. Complete a skill with the DEV ONLY panel: the map and bar update within 5 seconds, and Spark celebrates **once**.
+   4. Refresh: no celebration. Two quick completes: celebrations queue.
+   5. Keyboard only: Tab reaches only the unlocked skills. Check at 375px wide. No red console errors.
+   6. `npm run build && npm start`, then open `/dashboard`: the **DEV ONLY panel is gone** in production.
+6. If anything is broken, the file's owner fixes it on a new branch **with a test that would have caught it**.
+7. Post the handoff in the team channel:
+   - **Done:** Skill Map (`/skill-map`), live Progress Dashboard on `/dashboard`, unlock and level-up celebrations, WebSocket with polling fallback, tests.
+   - **For Step 4 (Pair F1):** skill cards link to `/module/[moduleId]`.
+   - **Mocked:** `api/mockProgress.ts` (10 seeded skills; DEV ONLY simulator).
+   - **Reusable:** `XpBar`, `useLiveProgress`, `useUnlockDetector`, `utils/levels.ts`.
+   - **Open questions for Backend:** the SYNC 4 answers still missing.
+
+**Later: connect the real backend (one small follow-up PR by Task 18's owner).**
+This is **blocked on Backend**: it needs skills data in `/progress/me` (or a new endpoint) **and** CORS for `http://localhost:3000` (the SYNC 4 request in Task 18). Then:
+1. Start the backend (`http://127.0.0.1:8000`). In your local `.env`, set `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000`, `NEXT_PUBLIC_WS_URL=ws://127.0.0.1:8000/ws` and `NEXT_PUBLIC_USE_MOCK=false`. Restart `npm run dev`.
+2. DevTools → Network: compare `/progress/me` with the `RawProgress` / `RawSkill` types in `api/progressApi.ts`.
+3. If the shapes or status words differ, **fix only `api/progressApi.ts`** (and `SkillStatus` in `types/progress.ts` if the words differ). No visual component changes.
+4. If Backend changes the level thresholds, update `utils/levels.ts` to match `backend/config/progression_rules.py`.
+5. Submit a real challenge (Step 6's submission panel): `level_up` / `badge_unlocked` arrive on the socket and the page refreshes **instantly**.
+6. Switch `NEXT_PUBLIC_USE_MOCK` back to `true` and check everything still works offline.
