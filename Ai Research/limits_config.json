@@ -1,0 +1,8 @@
+{
+  "day_boundary": "UTC",
+  "limits": {
+    "prompt_attempt": 15,
+    "hint": 5
+  },
+  "_note": "DRAFT numbers, not final until agreed with Backend (their Step 9)"
+}

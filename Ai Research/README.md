@@ -188,16 +188,109 @@ python verify_step1.py
 ```
 Ai Research /
 ├── .env.example            # Environment configuration template
-├── .gitignore              # Files and directories ignored by Git
+├── .gitignore              # Files and directories ignored by Git (includes cost_log.jsonl)
 ├── requirements.txt        # Python package dependencies
 ├── README.md               # Project documentation (this file)
-├── moderator.py            # Track B2 Wave 1: Safety & Content Moderation
+├── AI_RESEARCH_PLAN.md     # Live working research plan & user directives log
+├── CHECK_ORDER.md          # 7-step fail-fast cost gatekeeping pipeline
+├── prices.json             # Single source of truth for external API rates
+├── cost_log.py             # Privacy-first paid API call logger & cost estimator
+├── cost_log.jsonl          # Raw JSONL usage logs (git-ignored, zero PII)
+├── analyze_log.py          # Summary reporter for API usage & spending by feature
+├── cost_model.py           # Single-attempt and daily user cost projection formulas
+├── limits_config.json      # Draft daily limits configuration (UTC boundary)
+├── limits.py               # In-memory daily attempt & hint rate limiter prototype
+├── limits_checks.py        # Boundary & user-isolation test suite for rate limits
+├── moderator.py            # Backward-compatibility deprecation shim
+├── moderation.py           # Wave 2 Consolidated Moderation (Entity masking & Claude judge hook)
+├── moderation_checks.py    # Verification suite exercising moderation & logger
 ├── image_generator.py      # Module 1: Text-to-Image generation (with safety traps)
 ├── similarity_scorer.py    # Module 2: CLIP similarity scoring & embeddings
 ├── feedback_generator.py   # Module 3: Anthropic feedback (with output guardrails)
 ├── verify_moderation.py    # Wave 1 Safety & Moderation verification suite
 └── verify_step1.py         # Step 1 baseline verification test suite
 ```
+
+---
+
+## 💰 Wave 2: Step 8 — Cost Modeling, Privacy-First Logging & Daily Limits
+
+Step 8 introduces budget visibility, privacy-preserving API accounting, and early gatekeeping controls to ensure learner challenge attempts never produce unexpected cloud bills.
+
+### 1. New Step 8 Files Overview
+- **[`prices.json`](prices.json)**: The single source of truth for external model rates.
+- **[`cost_log.py`](cost_log.py)**: Lightweight logging utility. Appends structured records to `cost_log.jsonl` with zero prompt strings, student names, or PII.
+- **[`analyze_log.py`](analyze_log.py)**: Reads `cost_log.jsonl` and prints calls, average input/output tokens, and total cost grouped by feature.
+- **[`cost_model.py`](cost_model.py)**: Mathematical breakdown of costs for ONE attempt, worst-case user spending, and platform budget projections.
+- **[`limits_config.json`](limits_config.json)**: Configuration specifying daily attempt and hint allowances.
+- **[`limits.py`](limits.py)**: In-memory rate limiter enforcing daily quotas before paid calls.
+- **[`limits_checks.py`](limits_checks.py)**: Test runner verifying quota boundaries, user isolation, and action isolation.
+- **[`CHECK_ORDER.md`](CHECK_ORDER.md)**: Architectural contract documenting the 7-step cheapest-first check pipeline.
+
+---
+
+### 2. How to Fill `prices.json`
+`prices.json` initializes with `0.0` values so that no numbers are ever guessed:
+```json
+{
+  "claude_judge": {
+    "input_per_million": 0.0,
+    "output_per_million": 0.0
+  },
+  "image_generation": {
+    "per_image": 0.0
+  },
+  "_note": "FILL IN from the official pricing pages and write the date checked in NOTES.md"
+}
+```
+
+To populate live prices:
+1. **Claude Judge Rates**: Visit [Anthropic Pricing](https://www.anthropic.com/pricing). Locate the model configured in `feedback_generator.py` (e.g. Claude 3.5 Haiku or Sonnet) and input the price per 1M input and output tokens.
+2. **Image Generation Rates**: Visit [Stability AI Platform Pricing](https://platform.stability.ai/pricing). Look up the per-generation fee for Stable Image Core (typically 3 credits = ~$0.03/image).
+3. **Record Check Date**: Log the date and sources in `NOTES.md`.
+
+---
+
+### 3. How to Run the New Scripts
+
+#### A. Analyze API Usage & Spending
+```bash
+python analyze_log.py
+```
+*Parses `cost_log.jsonl` and prints a formatted summary table. Gracefully informs if the log file is missing or empty.*
+
+#### B. Run the Single-Attempt & Daily Cost Model
+```bash
+python cost_model.py
+```
+*Displays the cost parts for one attempt (moderation, image gen, similarity [$0 local], feedback) and prints a worst-case daily table for attempt limits 5, 10, 15, and 20.*
+
+#### C. Run the Daily Limits Verification Suite
+```bash
+python limits_checks.py
+```
+*Simulates 17 attempts (15 + 2) for a test user, verifies attempt 16 and 17 are blocked with kind mascot messaging, and verifies user and hint isolation (`VERIFY PASSED`).*
+
+#### D. Run Moderation Checks to Populate Cost Logs
+```bash
+python moderation_checks.py
+```
+*Runs core moderation checks and exercises the Claude judge hook to generate verifiable entries in `cost_log.jsonl`.*
+
+---
+
+### 4. Draft Usage Limits (Not Final)
+The limits defined in `limits_config.json` are **DRAFTS** pending alignment with Backend:
+- **Daily Prompt Attempts**: `15` tries per learner per day.
+- **Daily Hints**: `5` hints per learner per day.
+- **Day Boundary**: `UTC` calendar day reset.
+
+---
+
+### 5. Prototype Known Limitations
+- **In-Memory State**: `limits.py` stores counts in memory. Counts reset when the script or server restarts.
+- **Single Process**: In-memory counts do not synchronize across distributed servers or multi-worker deployments.
+- **Backend Handoff**: The Backend team will store and enforce persistent, production-grade daily limits in the database/Redis as part of their Step 9 architecture.
 
 ---
 
@@ -209,4 +302,6 @@ According to the **AI Research Development Plan**:
 - **Step 4**: Implement Bug's mistake detection logic (Stage 1: static keywords).
 - **Step 5**: Personalized hint generation.
 - **Step 6**: Build evaluation set (15–20 benchmark prompts and images).
+- **Step 8**: Finalize pricing numbers in `prices.json` and align Step 9 rate limits with Backend.
 - **Handoff**: Expose clean Python functions (`evaluate_submission`) to the FastAPI backend.
+

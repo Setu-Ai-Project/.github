@@ -26,3 +26,6 @@ test_*.jpg
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# API Cost & Usage Logs
+cost_log.jsonl
