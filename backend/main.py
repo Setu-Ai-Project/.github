@@ -1,6 +1,8 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
 
 from database import engine
@@ -33,6 +35,17 @@ from routes import (
 )
 
 
+def get_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS")
+    if raw is None:
+        return ["http://localhost:3000"]
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    origins = [origin for origin in origins if origin != "*"]
+    if not origins:
+        return ["http://localhost:3000"]
+    return origins
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Automatically create tables if they do not exist
@@ -42,6 +55,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Cross-Origin Resource Sharing (CORS) is a browser security mechanism that restricts
+# web applications from making requests to a domain different from the one that served the application.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_cors_origins(),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 app.include_router(user_router)
 app.include_router(module_router)
