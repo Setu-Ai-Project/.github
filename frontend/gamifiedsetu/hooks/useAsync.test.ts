@@ -37,7 +37,7 @@ describe("useAsync", () => {
     const { result } = renderHook(() => useAsync(asyncFunction));
 
     await waitFor(() => {
-      expect(result.current.error).toBe("Could not load lesson");
+      expect(result.current.error?.message).toBe("Could not load lesson");
     });
 
     expect(result.current.loading).toBe(false);
@@ -60,10 +60,23 @@ describe("useAsync", () => {
       result.current.reload();
     });
 
+    expect(result.current.loading).toBe(true);
+
     await waitFor(() => {
       expect(result.current.data).toBe("Second result");
     });
 
     expect(asyncFunction).toHaveBeenCalledTimes(2);
   });
+  it("does not load again on a normal re-render (no infinite loop)", async () => {
+  const asyncFunction = vi.fn().mockResolvedValue("hi");
+
+  const { result, rerender } = renderHook(() => useAsync(asyncFunction));
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  rerender();
+
+  expect(asyncFunction).toHaveBeenCalledTimes(1);
+});
 });
