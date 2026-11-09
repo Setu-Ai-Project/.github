@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 # pyrefly: ignore[missing-import]
 from sqlalchemy import Column, JSON
+# pyrefly: ignore[missing-import]
 from sqlmodel import Field, SQLModel
 
 
