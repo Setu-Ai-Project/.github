@@ -32,18 +32,23 @@ from routes import (
     byte_fact_router,
     challenge_router,
     submission_router,
+    me_router,
 )
 
 
 def get_cors_origins() -> list[str]:
-    raw = os.getenv("CORS_ORIGINS")
-    if raw is None:
-        return ["http://localhost:3000"]
-    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    origins = [origin for origin in origins if origin != "*"]
-    if not origins:
-        return ["http://localhost:3000"]
-    return origins
+    try:
+        from config import get_settings
+        return get_settings().cors_origins
+    except Exception:
+        raw = os.getenv("CORS_ORIGINS")
+        if raw is None:
+            return ["http://localhost:3000"]
+        origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+        origins = [origin for origin in origins if origin != "*"]
+        if not origins:
+            return ["http://localhost:3000"]
+        return origins
 
 
 @asynccontextmanager
@@ -66,6 +71,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+app.include_router(me_router)
 app.include_router(user_router)
 app.include_router(module_router)
 app.include_router(sub_module_router)

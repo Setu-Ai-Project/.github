@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # Virtual Environments
 .venv/
@@ -9,10 +10,16 @@ venv/
 ENV/
 env/
 
-# Environment Variables
+# Environment Variables and secrets
 .env
-.env.local
+.env.*
 *.env
+!.env.example
+!.env.*.example
+
+# IDE
+.idea/
+.vscode/
 
 # Distribution / packaging
 build/
