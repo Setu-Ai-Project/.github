@@ -3,7 +3,7 @@ import { levelProgress } from "@/utils/levels";
 import { fakeNetwork } from "./mockHelpers";
 
 // Flip to true only locally to test error states. Never commit it as true.
-export const MOCK_FORCE_ERROR = false;
+export const MOCK_FORCE_ERROR = true;
 // How long the fake server "thinks" before answering, in milliseconds.
 export const MOCK_DELAY_MS = 400;
 
@@ -123,7 +123,7 @@ export function unlockReadySkills(skills: Skill[]): Skill[] {
 
   return skills.map((skill) =>
     skill.status === "locked" && skill.prerequisites.every((id) => completeIds.has(id))
-      ? { ...skill, status: "in-progress" as const, progress: 0 }
+      ? { ...skill, status: "in-progress", progress: 0 }
       : skill
   );
 }
