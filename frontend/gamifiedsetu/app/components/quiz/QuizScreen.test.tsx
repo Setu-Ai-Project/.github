@@ -100,6 +100,24 @@ describe("QuizScreen", () => {
     expect(screen.getByText("Perfect score! You really know this.")).toBeInTheDocument();
   });
 
+  it("moves keyboard focus to the new content, but not on first load", async () => {
+    const user = userEvent.setup();
+    render(<QuizScreen moduleId="1" />);
+
+    expect(await screen.findByText("Question 1 of 2")).not.toHaveFocus();
+
+    await answer(user, "Right one");
+    await user.click(await screen.findByRole("button", { name: "Next question" }));
+    expect(await screen.findByText("Question 2 of 2")).toHaveFocus();
+
+    await answer(user, "Right two");
+    await user.click(await screen.findByRole("button", { name: "See results" }));
+    expect(await screen.findByRole("heading", { name: "Test Quiz" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Question 1 of 2")).toHaveFocus();
+  });
+
   it("scores 0 and stays kind when every answer is wrong", async () => {
     const user = userEvent.setup();
     render(<QuizScreen moduleId="1" />);

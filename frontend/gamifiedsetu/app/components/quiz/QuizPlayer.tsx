@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { MotionConfig, motion } from "motion/react";
+
 import ProgressBar from "@/app/components/common/ProgressBar";
 import { buttonClass } from "@/app/components/common/buttonStyles";
 import { useQuiz } from "@/hooks/useQuiz";
@@ -29,6 +32,23 @@ export default function QuizPlayer({ quiz, moduleId }: QuizPlayerProps) {
     restart,
   } = useQuiz(moduleId, quiz.questions);
 
+  // When the screen changes (next question, results, try again), the button the
+  // learner pressed disappears or becomes disabled, which drops keyboard focus.
+  // Move focus to the new content instead, so keyboard users never get lost.
+  const questionLabelRef = useRef<HTMLParagraphElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    // Don't steal focus when the quiz first appears.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (state.finished) titleRef.current?.focus();
+    else questionLabelRef.current?.focus();
+  }, [state.currentIndex, state.finished]);
+
   // A new key per moment makes each mascot appear fresh.
   const mascotNode = mascot && (
     <QuizMascot
@@ -40,8 +60,15 @@ export default function QuizPlayer({ quiz, moduleId }: QuizPlayerProps) {
     />
   );
 
+  // tabIndex={-1}: can receive focus from code, but isn't an extra Tab stop.
   const title = (
-    <h1 className="break-words font-display text-3xl font-bold">{quiz.title}</h1>
+    <h1
+      ref={titleRef}
+      tabIndex={-1}
+      className="break-words font-display text-3xl font-bold focus:outline-none"
+    >
+      {quiz.title}
+    </h1>
   );
 
   if (state.finished) {
@@ -64,20 +91,34 @@ export default function QuizPlayer({ quiz, moduleId }: QuizPlayerProps) {
       {title}
 
       <div className="flex flex-col gap-2">
-        <p className="font-display text-sm font-bold">
+        <p
+          ref={questionLabelRef}
+          tabIndex={-1}
+          className="font-display text-sm font-bold focus:outline-none"
+        >
           Question {questionNumber} of {total}
         </p>
         <ProgressBar value={questionNumber} max={total} label="Quiz progress" />
       </div>
 
-      <QuizQuestionCard
-        key={question.id}
-        question={question}
-        selectedIndex={state.selectedIndex}
-        onSelect={select}
-        isChecked={result !== null}
-        correctIndex={result?.correctIndex}
-      />
+      {/* A short fade-in for each new question. reducedMotion="user" skips it for
+          learners who turned animations off in their device settings. */}
+      <MotionConfig reducedMotion="user">
+        <motion.div
+          key={question.id}
+          initial={{ opacity: 0, x: 16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+        >
+          <QuizQuestionCard
+            question={question}
+            selectedIndex={state.selectedIndex}
+            onSelect={select}
+            isChecked={result !== null}
+            correctIndex={result?.correctIndex}
+          />
+        </motion.div>
+      </MotionConfig>
 
       {/* aria-live lets screen readers announce the feedback as it appears. */}
       <div aria-live="polite" className="flex flex-col gap-2">
