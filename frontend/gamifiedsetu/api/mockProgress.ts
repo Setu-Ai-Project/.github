@@ -3,7 +3,7 @@ import { levelProgress } from "@/utils/levels";
 import { fakeNetwork } from "./mockHelpers";
 
 // Flip to true only locally to test error states. Never commit it as true.
-export const MOCK_FORCE_ERROR = true;
+export const MOCK_FORCE_ERROR = false;
 // How long the fake server "thinks" before answering, in milliseconds.
 export const MOCK_DELAY_MS = 400;
 
