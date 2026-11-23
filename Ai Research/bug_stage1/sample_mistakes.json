@@ -1,0 +1,41 @@
+{
+  "_note": "FAKE placeholder data, to be replaced by the real tagged list",
+  "module": "module-1-FAKE",
+  "mistakes": [
+    {
+      "id": "m1-vague-words",
+      "phrase": "something nice",
+      "variants": ["something cool", "something good"],
+      "explanation": "Words like 'nice' are too general for the AI to picture.",
+      "fix_hint": "Name the exact thing, like 'a red kite'."
+    },
+    {
+      "id": "m1-any-colour",
+      "phrase": "any colour",
+      "variants": ["any color", "whatever colour", "whatever color"],
+      "explanation": "If you don't pick a colour, the AI has to guess, and it might not guess what you want.",
+      "fix_hint": "Choose the colours yourself, like 'bright yellow and deep blue'."
+    },
+    {
+      "id": "m1-you-know-what-i-mean",
+      "phrase": "you know what i mean",
+      "variants": [],
+      "explanation": "The AI can't read your mind, so it doesn't know what you mean unless you say it.",
+      "fix_hint": "Write down the picture that is in your head, one detail at a time."
+    },
+    {
+      "id": "m1-usual-style",
+      "phrase": "the usual style",
+      "variants": ["the normal style"],
+      "explanation": "The AI has no 'usual' style for you. Every prompt starts fresh.",
+      "fix_hint": "Name a style, like 'cartoon', 'watercolour' or 'pixel art'."
+    },
+    {
+      "id": "m1-make-it-better",
+      "phrase": "make it better",
+      "variants": ["make it nicer"],
+      "explanation": "'Better' means different things to different people, so the AI doesn't know what to change.",
+      "fix_hint": "Say what to change, like 'make the sky darker' or 'add more trees'."
+    }
+  ]
+}
