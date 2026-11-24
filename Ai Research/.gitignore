@@ -5,7 +5,11 @@ env/
 
 # Environment files containing secrets
 .env
+.env.*
+*.env
 *.env.local
+!.env.example
+!.env.*.example
 
 # Python bytecode & cache
 __pycache__/
