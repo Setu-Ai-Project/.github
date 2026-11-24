@@ -4,6 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import DevSimulator from "@/app/components/progress/DevSimulator";
+import ProgressDashboard from "@/app/components/progress/ProgressDashboard";
+import { useProgressPolling } from "@/hooks/useProgressPolling";
+
 const LEVELS = [
   {
     id: 1,
@@ -86,14 +90,15 @@ const LEVELS = [
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("Learner");
-  const [userXp] = useState(50);
-  const totalXpRequired = 100;
-  const progressPercent = Math.min(100, Math.round((userXp / totalXpRequired) * 100));
+  const { data: progress, loading: progressLoading, error: progressError } = useProgressPolling();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedName = localStorage.getItem("setuai_user_name");
-      if (storedName) setUserName(storedName);
+      if (storedName) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setUserName(storedName);
+      }
     }
   }, []);
 
@@ -128,7 +133,7 @@ export default function Dashboard() {
           </Link>
           <div className="flex items-center gap-2 rounded-xl border-2 border-ink bg-cream px-3 py-1 font-display text-sm font-black">
             <span className="text-coral">★</span>
-            <span>{userXp} XP</span>
+            <span>{progress ? progress.totalXp : "…"} XP</span>
           </div>
           <Link
             href="/"
@@ -161,28 +166,34 @@ export default function Dashboard() {
             </div>
 
             {/* Level status card */}
-            <div className="min-w-[260px] rounded-2xl border-4 border-ink bg-cream p-5 shadow-[4px_4px_0_#172A32]">
-              <div className="flex items-center justify-between font-display font-black">
-                <span className="text-lg">Level 1: Novice</span>
-                <span className="rounded-full border-2 border-ink bg-tealpop px-2.5 py-0.5 text-xs">
-                  {userXp} / {totalXpRequired} XP
-                </span>
-              </div>
-              <div
-                className="mt-3 h-4 w-full overflow-hidden rounded-full border-2 border-ink bg-white"
-                role="progressbar"
-                aria-valuenow={progressPercent}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div
-                  className="h-full rounded-full bg-tealpop transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <p className="mt-2 text-xs font-bold text-taskgray">
-                Earn 50 more XP to unlock Level 2 and the Ethical Builder Badge!
-              </p>
+            <div className="min-w-[260px]">
+              {progressLoading && !progress && (
+                <div className="rounded-2xl border-4 border-ink bg-cream p-5 shadow-[4px_4px_0_#172A32]">
+                  <p className="font-display text-sm font-bold text-taskgray">
+                    Loading your progress...
+                  </p>
+                </div>
+              )}
+
+              {progressError && !progress && (
+                <div className="rounded-2xl border-4 border-coral bg-cream p-5 shadow-[4px_4px_0_#172A32]">
+                  <p className="font-display text-sm font-bold text-ink">
+                    We could not load your progress. Please refresh the page.
+                  </p>
+                </div>
+              )}
+
+              {progress && (
+                <div className="flex flex-col items-center">
+                  <ProgressDashboard snapshot={progress} />
+                  <Link
+                    href="/skill-map"
+                    className="mt-2 text-xs font-bold text-coral hover:underline"
+                  >
+                    View skill map →
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -327,6 +338,8 @@ export default function Dashboard() {
             </Link>
           </div>
         </section>
+
+        <DevSimulator />
       </main>
     </div>
   );
