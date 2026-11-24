@@ -5,7 +5,22 @@ from sqlmodel import Session, select
 from database import get_session
 from models.bug_trigger import BugTrigger, BugTriggerRead
 
+from pydantic import BaseModel
+from services.ai_research_service import detect_mistakes
+
 router = APIRouter(prefix="/bug-triggers", tags=["Bug Triggers"])
+
+
+class CheckMistakesPayload(BaseModel):
+    text: str
+    module_id: Optional[str] = "default"
+
+
+@router.post("/check", summary="Check learner text for Bug mistakes using AI Research")
+def check_bug_mistakes(payload: CheckMistakesPayload) -> list[dict]:
+    """Matches text against human-tagged mistake phrases and returns Bug hints."""
+    return detect_mistakes(payload.text, payload.module_id or "default")
+
 
 
 @router.get("/", response_model=list[BugTriggerRead])

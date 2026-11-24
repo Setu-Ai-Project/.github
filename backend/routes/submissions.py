@@ -18,6 +18,7 @@ from models.submission import (
 from models.user import User
 from realtime.notify import notify_progress
 from services.ai_moderation import check_learner_text_safety
+from services.ai_research_service import detect_mistakes
 from services.progression import award_xp
 from services.verifier import verify_answer
 
@@ -129,7 +130,13 @@ def create_submission(
     else:
         # 7. Needs revision: store the specific feedback (a new list, so it saves)
         submission.status = SubmissionStatus.NEEDS_REVISION
-        submission.feedback = list(verification.feedback)
+        feedback_items = list(verification.feedback)
+        # Enrich with Bug mascot mistake hints from AI Research if matched
+        for m in detect_mistakes(text):
+            hint = m.get("fix_hint") or m.get("explanation")
+            if hint and hint not in feedback_items:
+                feedback_items.append(f"Bug hint: {hint}")
+        submission.feedback = feedback_items
 
     # 8. Save the result and respond
     session.add(submission)

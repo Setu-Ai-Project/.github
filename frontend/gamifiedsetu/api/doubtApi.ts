@@ -1,4 +1,5 @@
 import type { Doubt } from "@/types/doubt";
+import { shouldUseMock } from "./mockHelpers";
 import {
   mockCreateDoubt,
   mockListDoubts,
@@ -7,7 +8,7 @@ import {
 
 // When true, uses client-side localStorage simulation.
 // When false, connects to the real backend via process.env.NEXT_PUBLIC_API_URL.
-export const USE_MOCK = true;
+export const USE_MOCK = shouldUseMock();
 
 export async function listDoubts(): Promise<Doubt[]> {
   if (USE_MOCK) {

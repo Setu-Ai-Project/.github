@@ -39,7 +39,6 @@ class Settings:
             if not origins:
                 self.cors_origins = [
                     "http://localhost:3000",
-                    "http://localhost:5173",
                 ]
             else:
                 self.cors_origins = origins

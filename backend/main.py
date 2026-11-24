@@ -33,6 +33,7 @@ from routes import (
     challenge_router,
     submission_router,
     me_router,
+    ai_router,
 )
 
 
@@ -82,6 +83,7 @@ app.include_router(spark_term_router)
 app.include_router(byte_fact_router)
 app.include_router(challenge_router)
 app.include_router(submission_router)
+app.include_router(ai_router)
 app.include_router(ws_router)
 
 
